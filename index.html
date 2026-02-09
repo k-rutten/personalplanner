@@ -323,15 +323,14 @@
             };
 
             return (
-                <div className="flex items-center justify-between" style={{ height: '44px', padding: '0 16px' }}>
-                    <span style={{ fontSize: '17px', color: 'var(--label-primary)', fontWeight: 400, letterSpacing: '-0.4px' }}>{label}</span>
+                <div className="flex items-center justify-between" style={{ height: '44px', padding: '0 20px' }}>
+                    <span style={{ fontSize: '15px', color: 'var(--label-secondary)', fontWeight: 400 }}>{label}</span>
                     <div style={{
-                        background: focused ? 'rgba(0, 122, 255, 0.12)' : 'var(--system-gray5)',
+                        background: 'var(--system-gray6)',
                         borderRadius: '6px',
-                        padding: '6px 0',
-                        width: '64px',
-                        textAlign: 'center',
-                        transition: 'background 0.15s ease'
+                        padding: '5px 12px',
+                        minWidth: '56px',
+                        textAlign: 'center'
                     }}>
                         <input
                             type="number"
@@ -348,11 +347,12 @@
                                 width: '100%',
                                 fontSize: '17px',
                                 fontWeight: 600,
-                                color: 'var(--system-blue)',
+                                color: focused ? 'var(--system-blue)' : 'var(--label-primary)',
                                 background: 'transparent',
                                 border: 'none',
                                 padding: 0,
-                                letterSpacing: '-0.4px'
+                                letterSpacing: '-0.4px',
+                                transition: 'color 0.15s ease'
                             }}
                         />
                     </div>
