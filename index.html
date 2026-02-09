@@ -48,7 +48,7 @@
         function createEmptyWeek() {
             const days = {};
             DAYS.forEach(day => {
-                days[day] = { entries: [{ id: Date.now() + Math.random(), task: '', hours: 0 }], freeHours: 0 };
+                days[day] = { workHours: 0, freeHours: 0 };
             });
             return days;
         }
@@ -67,83 +67,45 @@
         // --- Components ---
 
         function DayColumn({ day, dayIndex, mondayDate, data, onChange }) {
-            const entries = data.entries || [];
-            const freeHours = data.freeHours || 0;
-
-            const totalWork = entries.reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0);
-            const totalDay = totalWork + freeHours;
+            const workHours = parseFloat(data.workHours) || 0;
+            const freeHours = parseFloat(data.freeHours) || 0;
+            const totalDay = workHours + freeHours;
             const approved = totalDay >= HOURS_PER_DAY;
 
-            const updateEntry = (idx, field, value) => {
-                const next = { ...data, entries: entries.map((e, i) => i === idx ? { ...e, [field]: field === 'hours' ? value : value } : e) };
-                onChange(day, next);
-            };
-
-            const addEntry = () => {
-                const next = { ...data, entries: [...entries, { id: Date.now() + Math.random(), task: '', hours: 0 }] };
-                onChange(day, next);
-            };
-
-            const removeEntry = (idx) => {
-                if (entries.length <= 1) return;
-                const next = { ...data, entries: entries.filter((_, i) => i !== idx) };
-                onChange(day, next);
-            };
-
-            const setFree = (val) => {
-                onChange(day, { ...data, freeHours: val });
-            };
+            const setWork = (val) => onChange(day, { ...data, workHours: val });
+            const setFree = (val) => onChange(day, { ...data, freeHours: val });
 
             return (
-                <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-w-[200px] flex-1">
+                <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-w-[180px] flex-1">
                     {/* Header */}
                     <div className={`px-4 py-3 text-center border-b ${approved ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                         <div className="font-semibold text-gray-800">{DAY_LABELS[day]}</div>
                         <div className="text-xs text-gray-500">{getDayDate(mondayDate, dayIndex)}</div>
                         <div className={`mt-1 text-sm font-medium ${approved ? 'text-green-600' : 'text-orange-500'}`}>
-                            {totalDay.toFixed(1)} / {HOURS_PER_DAY}u {approved ? '✓' : ''}
+                            {totalDay.toFixed(1)} / {HOURS_PER_DAY}u {approved ? '\u2713' : ''}
                         </div>
                     </div>
 
-                    {/* Entries */}
-                    <div className="flex-1 p-3 space-y-2">
-                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Taken</div>
-                        {entries.map((entry, idx) => (
-                            <div key={entry.id} className="flex items-center gap-1.5 group">
-                                <input
-                                    type="text"
-                                    value={entry.task}
-                                    onChange={e => updateEntry(idx, 'task', e.target.value)}
-                                    placeholder="Taak..."
-                                    className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-gray-50 hover:bg-white transition"
-                                />
-                                <input
-                                    type="number"
-                                    value={entry.hours || ''}
-                                    onChange={e => updateEntry(idx, 'hours', parseFloat(e.target.value) || 0)}
-                                    placeholder="0"
-                                    min="0"
-                                    max="24"
-                                    step="0.5"
-                                    className="w-14 text-sm text-center px-1 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-gray-50 hover:bg-white transition"
-                                />
-                                <button
-                                    onClick={() => removeEntry(idx)}
-                                    className={`text-gray-300 hover:text-red-400 transition text-lg leading-none ${entries.length <= 1 ? 'invisible' : 'opacity-0 group-hover:opacity-100'}`}
-                                    title="Verwijder"
-                                >×</button>
-                            </div>
-                        ))}
-                        <button
-                            onClick={addEntry}
-                            className="w-full text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md py-1.5 transition"
-                        >+ Taak toevoegen</button>
-                    </div>
+                    {/* Work hours */}
+                    <div className="flex-1 p-3 space-y-3">
+                        <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-3 border border-blue-100">
+                            <span className="text-sm text-blue-700 font-medium whitespace-nowrap flex-1">Werk</span>
+                            <input
+                                type="number"
+                                value={workHours || ''}
+                                onChange={e => setWork(parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                                min="0"
+                                max="24"
+                                step="0.5"
+                                className="w-16 text-sm text-center px-1 py-1.5 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                            />
+                            <span className="text-xs text-blue-500">uur</span>
+                        </div>
 
-                    {/* Free hours */}
-                    <div className="px-3 pb-3">
-                        <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-                            <span className="text-xs text-amber-700 font-medium whitespace-nowrap">Vrij</span>
+                        {/* Free hours */}
+                        <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-3 border border-amber-100">
+                            <span className="text-sm text-amber-700 font-medium whitespace-nowrap flex-1">Vrij</span>
                             <input
                                 type="number"
                                 value={freeHours || ''}
@@ -152,16 +114,16 @@
                                 min="0"
                                 max="8"
                                 step="0.5"
-                                className="w-14 text-sm text-center px-1 py-1 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                                className="w-16 text-sm text-center px-1 py-1.5 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
                             />
-                            <span className="text-xs text-amber-600">uur</span>
+                            <span className="text-xs text-amber-500">uur</span>
                         </div>
                     </div>
 
                     {/* Day summary */}
                     <div className={`px-3 py-2 text-xs border-t ${approved ? 'bg-green-50 border-green-100 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
                         <div className="flex justify-between">
-                            <span>Werk: {totalWork.toFixed(1)}u</span>
+                            <span>Werk: {workHours.toFixed(1)}u</span>
                             <span>Vrij: {freeHours.toFixed(1)}u</span>
                         </div>
                     </div>
@@ -175,8 +137,8 @@
             let approvedDays = 0;
 
             DAYS.forEach(day => {
-                const d = days[day] || { entries: [], freeHours: 0 };
-                const work = (d.entries || []).reduce((s, e) => s + (parseFloat(e.hours) || 0), 0);
+                const d = days[day] || { workHours: 0, freeHours: 0 };
+                const work = parseFloat(d.workHours) || 0;
                 const free = parseFloat(d.freeHours) || 0;
                 totalWork += work;
                 totalFree += free;
@@ -292,7 +254,7 @@
                                 day={day}
                                 dayIndex={i}
                                 mondayDate={currentMonday}
-                                data={weekData[day] || { entries: [{ id: 1, task: '', hours: 0 }], freeHours: 0 }}
+                                data={weekData[day] || { workHours: 0, freeHours: 0 }}
                                 onChange={handleDayChange}
                             />
                         ))}
