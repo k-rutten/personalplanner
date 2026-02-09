@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekplanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="root"></div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo } = React;
+
+        const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag'];
+        const DAY_LABELS = { maandag: 'Maandag', dinsdag: 'Dinsdag', woensdag: 'Woensdag', donderdag: 'Donderdag', vrijdag: 'Vrijdag' };
+        const HOURS_PER_DAY = 8;
+        const STORAGE_KEY = 'weekplanner_data';
+
+        function getMonday(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function getDayDate(mondayDate, dayIndex) {
+            const d = new Date(mondayDate);
+            d.setDate(d.getDate() + dayIndex);
+            return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+        }
+
+        function createEmptyWeek() {
+            const days = {};
+            DAYS.forEach(day => {
+                days[day] = { entries: [{ id: Date.now() + Math.random(), task: '', hours: 0 }], freeHours: 0 };
+            });
+            return days;
+        }
+
+        function loadAllData() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch { return {}; }
+        }
+
+        function saveAllData(data) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        // --- Components ---
+
+        function DayColumn({ day, dayIndex, mondayDate, data, onChange }) {
+            const entries = data.entries || [];
+            const freeHours = data.freeHours || 0;
+
+            const totalWork = entries.reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0);
+            const totalDay = totalWork + freeHours;
+            const approved = totalDay >= HOURS_PER_DAY;
+
+            const updateEntry = (idx, field, value) => {
+                const next = { ...data, entries: entries.map((e, i) => i === idx ? { ...e, [field]: field === 'hours' ? value : value } : e) };
+                onChange(day, next);
+            };
+
+            const addEntry = () => {
+                const next = { ...data, entries: [...entries, { id: Date.now() + Math.random(), task: '', hours: 0 }] };
+                onChange(day, next);
+            };
+
+            const removeEntry = (idx) => {
+                if (entries.length <= 1) return;
+                const next = { ...data, entries: entries.filter((_, i) => i !== idx) };
+                onChange(day, next);
+            };
+
+            const setFree = (val) => {
+                onChange(day, { ...data, freeHours: val });
+            };
+
+            return (
+                <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-w-[200px] flex-1">
+                    {/* Header */}
+                    <div className={`px-4 py-3 text-center border-b ${approved ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                        <div className="font-semibold text-gray-800">{DAY_LABELS[day]}</div>
+                        <div className="text-xs text-gray-500">{getDayDate(mondayDate, dayIndex)}</div>
+                        <div className={`mt-1 text-sm font-medium ${approved ? 'text-green-600' : 'text-orange-500'}`}>
+                            {totalDay.toFixed(1)} / {HOURS_PER_DAY}u {approved ? '✓' : ''}
+                        </div>
+                    </div>
+
+                    {/* Entries */}
+                    <div className="flex-1 p-3 space-y-2">
+                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Taken</div>
+                        {entries.map((entry, idx) => (
+                            <div key={entry.id} className="flex items-center gap-1.5 group">
+                                <input
+                                    type="text"
+                                    value={entry.task}
+                                    onChange={e => updateEntry(idx, 'task', e.target.value)}
+                                    placeholder="Taak..."
+                                    className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-gray-50 hover:bg-white transition"
+                                />
+                                <input
+                                    type="number"
+                                    value={entry.hours || ''}
+                                    onChange={e => updateEntry(idx, 'hours', parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    min="0"
+                                    max="24"
+                                    step="0.5"
+                                    className="w-14 text-sm text-center px-1 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-gray-50 hover:bg-white transition"
+                                />
+                                <button
+                                    onClick={() => removeEntry(idx)}
+                                    className={`text-gray-300 hover:text-red-400 transition text-lg leading-none ${entries.length <= 1 ? 'invisible' : 'opacity-0 group-hover:opacity-100'}`}
+                                    title="Verwijder"
+                                >×</button>
+                            </div>
+                        ))}
+                        <button
+                            onClick={addEntry}
+                            className="w-full text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md py-1.5 transition"
+                        >+ Taak toevoegen</button>
+                    </div>
+
+                    {/* Free hours */}
+                    <div className="px-3 pb-3">
+                        <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                            <span className="text-xs text-amber-700 font-medium whitespace-nowrap">Vrij</span>
+                            <input
+                                type="number"
+                                value={freeHours || ''}
+                                onChange={e => setFree(parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                                min="0"
+                                max="8"
+                                step="0.5"
+                                className="w-14 text-sm text-center px-1 py-1 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                            />
+                            <span className="text-xs text-amber-600">uur</span>
+                        </div>
+                    </div>
+
+                    {/* Day summary */}
+                    <div className={`px-3 py-2 text-xs border-t ${approved ? 'bg-green-50 border-green-100 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
+                        <div className="flex justify-between">
+                            <span>Werk: {totalWork.toFixed(1)}u</span>
+                            <span>Vrij: {freeHours.toFixed(1)}u</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function WeekSummary({ days }) {
+            let totalWork = 0;
+            let totalFree = 0;
+            let approvedDays = 0;
+
+            DAYS.forEach(day => {
+                const d = days[day] || { entries: [], freeHours: 0 };
+                const work = (d.entries || []).reduce((s, e) => s + (parseFloat(e.hours) || 0), 0);
+                const free = parseFloat(d.freeHours) || 0;
+                totalWork += work;
+                totalFree += free;
+                if (work + free >= HOURS_PER_DAY) approvedDays++;
+            });
+
+            const totalHours = totalWork + totalFree;
+            const weekTarget = HOURS_PER_DAY * 5;
+            const pct = Math.min((totalHours / weekTarget) * 100, 100);
+
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-800">Weektotaal</h2>
+                            <p className="text-sm text-gray-500 mt-0.5">
+                                {approvedDays} van 5 dagen voltooid
+                            </p>
+                        </div>
+
+                        <div className="flex gap-6">
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-blue-600">{totalWork.toFixed(1)}</div>
+                                <div className="text-xs text-gray-500">Werkuren</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-amber-500">{totalFree.toFixed(1)}</div>
+                                <div className="text-xs text-gray-500">Vrije uren</div>
+                            </div>
+                            <div className="text-center">
+                                <div className={`text-2xl font-bold ${totalHours >= weekTarget ? 'text-green-600' : 'text-gray-700'}`}>{totalHours.toFixed(1)}</div>
+                                <div className="text-xs text-gray-500">/ {weekTarget}u totaal</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mt-4 bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all duration-500 ${totalHours >= weekTarget ? 'bg-green-500' : 'bg-blue-500'}`}
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
+            const [allData, setAllData] = useState(() => loadAllData());
+
+            const weekKey = formatDate(currentMonday);
+            const weekData = allData[weekKey] || createEmptyWeek();
+
+            useEffect(() => {
+                saveAllData(allData);
+            }, [allData]);
+
+            const handleDayChange = useCallback((day, newDayData) => {
+                setAllData(prev => ({
+                    ...prev,
+                    [weekKey]: {
+                        ...(prev[weekKey] || createEmptyWeek()),
+                        [day]: newDayData,
+                    }
+                }));
+            }, [weekKey]);
+
+            const goWeek = (offset) => {
+                const next = new Date(currentMonday);
+                next.setDate(next.getDate() + offset * 7);
+                setCurrentMonday(next);
+            };
+
+            const goToday = () => setCurrentMonday(getMonday(new Date()));
+
+            const weekEnd = new Date(currentMonday);
+            weekEnd.setDate(weekEnd.getDate() + 4);
+
+            const weekLabel = `${currentMonday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} — ${weekEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Weekplanner</h1>
+                            <p className="text-sm text-gray-500">{weekLabel}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => goWeek(-1)} className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                                ← Vorige
+                            </button>
+                            <button onClick={goToday} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">
+                                Vandaag
+                            </button>
+                            <button onClick={() => goWeek(1)} className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                                Volgende →
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Week summary */}
+                    <div className="mb-6">
+                        <WeekSummary days={weekData} />
+                    </div>
+
+                    {/* Day columns */}
+                    <div className="flex gap-3 overflow-x-auto pb-4">
+                        {DAYS.map((day, i) => (
+                            <DayColumn
+                                key={day}
+                                day={day}
+                                dayIndex={i}
+                                mondayDate={currentMonday}
+                                data={weekData[day] || { entries: [{ id: 1, task: '', hours: 0 }], freeHours: 0 }}
+                                onChange={handleDayChange}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
