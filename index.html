@@ -298,7 +298,7 @@
             );
         }
 
-        // --- Inline Hours Input ---
+        // --- Inline Hours Input (iOS chip style) ---
         function HoursInput({ value, onChange, max, label }) {
             const [focused, setFocused] = useState(false);
             const [localValue, setLocalValue] = useState('');
@@ -322,30 +322,43 @@
                 }
             };
 
+            const displayValue = focused ? localValue : (value ? fmt(value) : '0');
+
             return (
                 <div className="flex items-center" style={{ height: '44px', padding: '0 16px' }}>
                     <span style={{ fontSize: '15px', color: 'var(--label-primary)', fontWeight: 400 }}>{label}</span>
-                    <input
-                        type="number"
-                        value={focused ? localValue : (value || '')}
-                        onChange={handleChange}
-                        onFocus={(e) => { setFocused(true); setLocalValue(value ? String(value) : ''); e.target.select(); }}
-                        onBlur={handleBlur}
-                        placeholder="0"
-                        pattern="[0-9]*"
-                        inputMode="numeric"
-                        min="0" max={max} step="0.5"
-                        className="ml-auto text-right focus:outline-none"
-                        style={{
-                            width: '64px',
-                            fontSize: '15px',
-                            fontWeight: 600,
-                            color: 'var(--system-blue)',
-                            background: 'transparent',
-                            border: 'none',
-                            padding: 0
-                        }}
-                    />
+                    <div className="ml-auto relative">
+                        <div className="rounded-lg transition-colors duration-150"
+                            style={{
+                                background: focused ? 'var(--system-blue)' : 'var(--system-gray6)',
+                                padding: '4px 12px',
+                                minWidth: '52px',
+                                textAlign: 'center'
+                            }}>
+                            <input
+                                type="number"
+                                value={focused ? localValue : (value || '')}
+                                onChange={handleChange}
+                                onFocus={(e) => { setFocused(true); setLocalValue(value ? String(value) : ''); e.target.select(); }}
+                                onBlur={handleBlur}
+                                placeholder="0"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                min="0" max={max} step="0.5"
+                                className="text-center focus:outline-none"
+                                style={{
+                                    width: '100%',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    color: focused ? '#FFFFFF' : 'var(--system-blue)',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: 0,
+                                    minWidth: '28px'
+                                }}
+                            />
+                        </div>
+                    </div>
                 </div>
             );
         }
