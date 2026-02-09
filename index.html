@@ -162,7 +162,6 @@
                                     const free = parseFloat(d.freeHours) || 0;
                                     const total = work + free;
                                     const overLimit = total > HOURS_PER_DAY;
-                                    const isToday = i === todayIndex;
 
                                     const workPx = chartMax > 0 ? (work / chartMax) * barAreaH : 0;
                                     const freePx = chartMax > 0 ? (free / chartMax) * barAreaH : 0;
@@ -188,18 +187,16 @@
                                                     overflow: 'hidden',
                                                     transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                                                 }}>
-                                                    {/* Work (bottom) */}
+                                                    {/* Work (bottom — blue) */}
                                                     <div style={{
                                                         height: work > 0 ? `${(work / total) * 100}%` : '0',
-                                                        background: isToday ? 'var(--system-blue)' : 'var(--system-teal)',
-                                                        opacity: isToday ? 1 : 0.6,
+                                                        background: 'var(--system-blue)',
                                                         minHeight: work > 0 ? '2px' : '0'
                                                     }} />
-                                                    {/* Free (top) */}
+                                                    {/* Free (top — light blue) */}
                                                     <div style={{
                                                         height: free > 0 ? `${(free / total) * 100}%` : '0',
-                                                        background: isToday ? 'var(--system-blue)' : 'var(--system-teal)',
-                                                        opacity: isToday ? 0.5 : 0.3,
+                                                        background: 'var(--system-teal)',
                                                         minHeight: free > 0 ? '2px' : '0'
                                                     }} />
                                                 </div>
