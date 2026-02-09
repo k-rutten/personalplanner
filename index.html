@@ -112,30 +112,29 @@
         // --- iOS Screen Time style Bar Chart ---
         const DAY_SINGLE = { maandag: 'M', dinsdag: 'D', woensdag: 'W', donderdag: 'D', vrijdag: 'V' };
 
-        function WeekBarChart({ days, todayIndex }) {
+        function WeekBarChart({ days }) {
             const maxHours = Math.max(HOURS_PER_DAY, ...DAYS.map(d => {
                 const dd = days[d] || { workHours: 0, freeHours: 0 };
                 return (parseFloat(dd.workHours) || 0) + (parseFloat(dd.freeHours) || 0);
             }));
-            // Round up to nearest even number for clean Y-axis
             const chartMax = Math.ceil((Math.max(maxHours, HOURS_PER_DAY) + 1) / 2) * 2;
             const gridSteps = [];
             for (let i = 0; i <= chartMax; i += Math.max(1, Math.floor(chartMax / 4))) {
                 gridSteps.push(i);
             }
-            // Ensure chartMax is in gridSteps
             if (gridSteps[gridSteps.length - 1] !== chartMax) gridSteps.push(chartMax);
 
             const targetPct = (HOURS_PER_DAY / chartMax) * 100;
             const barAreaH = 120;
+            const labelRowH = 24;
 
             return (
-                <div className="w-full">
-                    {/* Chart container */}
-                    <div className="relative flex" style={{ height: `${barAreaH}px` }}>
+                <div className="w-full flex">
+                    {/* Bordered chart container (bars + grid + x-axis labels) */}
+                    <div className="flex-1" style={{ border: '0.5px solid var(--system-gray5)', borderRadius: '4px', overflow: 'hidden' }}>
                         {/* Bar area */}
-                        <div className="relative flex-1">
-                            {/* Horizontal grid lines */}
+                        <div className="relative" style={{ height: `${barAreaH}px` }}>
+                            {/* Horizontal grid lines — full width */}
                             {gridSteps.map(step => {
                                 const pct = (step / chartMax) * 100;
                                 return (
@@ -154,52 +153,48 @@
                                 }} />
                             </div>
 
-                            {/* Bars */}
-                            <div className="flex items-end h-full" style={{ gap: '3px', padding: '0 2px' }}>
+                            {/* Bars + vertical dividers */}
+                            <div className="flex items-end h-full">
                                 {DAYS.map((day, i) => {
                                     const d = days[day] || { workHours: 0, freeHours: 0 };
                                     const work = parseFloat(d.workHours) || 0;
                                     const free = parseFloat(d.freeHours) || 0;
                                     const total = work + free;
                                     const overLimit = total > HOURS_PER_DAY;
-
-                                    const workPx = chartMax > 0 ? (work / chartMax) * barAreaH : 0;
-                                    const freePx = chartMax > 0 ? (free / chartMax) * barAreaH : 0;
-                                    const totalPx = workPx + freePx;
-
-                                    if (total === 0) return (
-                                        <div key={day} className="flex-1" />
-                                    );
+                                    const totalPx = chartMax > 0 ? (total / chartMax) * barAreaH : 0;
 
                                     return (
-                                        <div key={day} className="flex-1 flex items-end">
-                                            {overLimit ? (
-                                                <div className="w-full" style={{
-                                                    height: `${Math.max(totalPx, 4)}px`,
-                                                    background: 'var(--system-red)',
-                                                    borderRadius: '4px 4px 0 0',
-                                                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                                                }} />
-                                            ) : (
-                                                <div className="w-full flex flex-col-reverse" style={{
-                                                    height: `${Math.max(totalPx, 4)}px`,
-                                                    borderRadius: '4px 4px 0 0',
-                                                    overflow: 'hidden',
-                                                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                                                }}>
-                                                    {/* Work (bottom — blue) */}
+                                        <div key={day} className="flex-1 flex items-end justify-center relative"
+                                            style={{ borderRight: i < DAYS.length - 1 ? '0.5px solid var(--system-gray5)' : 'none' }}>
+                                            {total > 0 && (
+                                                overLimit ? (
                                                     <div style={{
-                                                        height: work > 0 ? `${(work / total) * 100}%` : '0',
-                                                        background: 'var(--system-blue)',
-                                                        minHeight: work > 0 ? '2px' : '0'
+                                                        width: '70%',
+                                                        height: `${Math.max(totalPx, 4)}px`,
+                                                        background: 'var(--system-red)',
+                                                        borderRadius: '4px 4px 0 0',
+                                                        transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                                                     }} />
-                                                    {/* Free (top — light blue) */}
-                                                    <div style={{
-                                                        height: free > 0 ? `${(free / total) * 100}%` : '0',
-                                                        background: 'var(--system-teal)',
-                                                        minHeight: free > 0 ? '2px' : '0'
-                                                    }} />
-                                                </div>
+                                                ) : (
+                                                    <div className="flex flex-col-reverse" style={{
+                                                        width: '70%',
+                                                        height: `${Math.max(totalPx, 4)}px`,
+                                                        borderRadius: '4px 4px 0 0',
+                                                        overflow: 'hidden',
+                                                        transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                                                    }}>
+                                                        <div style={{
+                                                            height: work > 0 ? `${(work / total) * 100}%` : '0',
+                                                            background: 'var(--system-blue)',
+                                                            minHeight: work > 0 ? '2px' : '0'
+                                                        }} />
+                                                        <div style={{
+                                                            height: free > 0 ? `${(free / total) * 100}%` : '0',
+                                                            background: 'var(--system-teal)',
+                                                            minHeight: free > 0 ? '2px' : '0'
+                                                        }} />
+                                                    </div>
+                                                )
                                             )}
                                         </div>
                                     );
@@ -207,51 +202,48 @@
                             </div>
                         </div>
 
-                        {/* Y-axis labels (right side) */}
-                        <div className="relative flex-shrink-0" style={{ width: '32px', marginLeft: '4px' }}>
-                            {gridSteps.map(step => {
-                                const pct = (step / chartMax) * 100;
-                                return (
-                                    <span key={step} className="absolute right-0" style={{
-                                        bottom: `${pct}%`,
-                                        transform: 'translateY(50%)',
-                                        fontSize: '11px',
-                                        fontWeight: 400,
-                                        color: 'var(--label-secondary)',
-                                        lineHeight: 1
-                                    }}>
-                                        {step === 0 ? '0' : `${step} u`}
+                        {/* X-axis day labels — inside border */}
+                        <div className="flex" style={{ height: `${labelRowH}px`, borderTop: '0.5px solid var(--system-gray5)' }}>
+                            {DAYS.map((day, i) => (
+                                <div key={day} className="flex-1 flex items-center justify-center"
+                                    style={{ borderRight: i < DAYS.length - 1 ? '0.5px solid var(--system-gray5)' : 'none' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: 1 }}>
+                                        {DAY_SINGLE[day]}
                                     </span>
-                                );
-                            })}
-                            {/* Average label aligned with target line */}
-                            <span className="absolute right-0" style={{
-                                bottom: `${targetPct}%`,
-                                transform: 'translateY(-120%)',
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: 'var(--system-green)',
-                                lineHeight: 1,
-                                whiteSpace: 'nowrap'
-                            }}>gemid.</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Day labels (single letter) */}
-                    <div className="flex" style={{ marginTop: '6px', paddingRight: '36px' }}>
-                        {DAYS.map((day, i) => (
-                            <div key={day} className="flex-1 text-center" style={{
-                                fontSize: '11px',
-                                fontWeight: 400,
-                                color: i === todayIndex ? 'var(--label-primary)' : 'var(--label-secondary)',
-                                lineHeight: '16px'
-                            }}>
-                                {DAY_SINGLE[day]}
-                            </div>
-                        ))}
+                    {/* Y-axis labels + gemid. label — outside border, to the right */}
+                    <div className="relative flex-shrink-0" style={{ width: '40px', marginBottom: `${labelRowH}px` }}>
+                        {gridSteps.map(step => {
+                            const pct = (step / chartMax) * 100;
+                            return (
+                                <span key={step} className="absolute" style={{
+                                    right: 0,
+                                    bottom: `${pct}%`,
+                                    transform: 'translateY(50%)',
+                                    fontSize: '11px',
+                                    fontWeight: 400,
+                                    color: 'var(--label-secondary)',
+                                    lineHeight: 1
+                                }}>
+                                    {step === 0 ? '0' : `${step} u`}
+                                </span>
+                            );
+                        })}
+                        <span className="absolute" style={{
+                            right: 0,
+                            bottom: `${targetPct}%`,
+                            transform: 'translateY(-140%)',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: 'var(--system-green)',
+                            lineHeight: 1,
+                            whiteSpace: 'nowrap'
+                        }}>gemid.</span>
                     </div>
-
-                    {/* No legend — bottom stats in WeekSummary serve as legend via color */}
                 </div>
             );
         }
