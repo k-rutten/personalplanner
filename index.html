@@ -64,6 +64,22 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
 
+        function encodeWeekToURL(weekKey, weekData) {
+            const payload = { week: weekKey, days: weekData };
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+            return window.location.origin + window.location.pathname + '?d=' + encoded;
+        }
+
+        function decodeWeekFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const encoded = params.get('d');
+            if (!encoded) return null;
+            try {
+                const json = decodeURIComponent(escape(atob(encoded)));
+                return JSON.parse(json);
+            } catch { return null; }
+        }
+
         // --- Components ---
 
         function DayColumn({ day, dayIndex, mondayDate, data, onChange }) {
@@ -192,13 +208,34 @@
         function App() {
             const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
             const [allData, setAllData] = useState(() => loadAllData());
+            const [copied, setCopied] = useState(false);
+            const [sharedBanner, setSharedBanner] = useState(null);
 
             const weekKey = formatDate(currentMonday);
             const weekData = allData[weekKey] || createEmptyWeek();
 
+            // Load shared data from URL on mount
+            useEffect(() => {
+                const shared = decodeWeekFromURL();
+                if (shared && shared.week && shared.days) {
+                    setAllData(prev => ({ ...prev, [shared.week]: shared.days }));
+                    setCurrentMonday(new Date(shared.week));
+                    setSharedBanner(shared.week);
+                    window.history.replaceState({}, '', window.location.pathname);
+                }
+            }, []);
+
             useEffect(() => {
                 saveAllData(allData);
             }, [allData]);
+
+            const shareWeek = () => {
+                const url = encodeWeekToURL(weekKey, weekData);
+                navigator.clipboard.writeText(url).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                });
+            };
 
             const handleDayChange = useCallback((day, newDayData) => {
                 setAllData(prev => ({
@@ -241,8 +278,19 @@
                             <button onClick={() => goWeek(1)} className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm">
                                 Volgende →
                             </button>
+                            <button onClick={shareWeek} className={`px-3 py-2 text-sm rounded-lg transition shadow-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
+                                {copied ? 'Gekopieerd!' : 'Deel week'}
+                            </button>
                         </div>
                     </div>
+
+                    {/* Shared banner */}
+                    {sharedBanner && (
+                        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center justify-between">
+                            <span className="text-sm text-blue-700">Gedeelde weekplanning geladen en opgeslagen.</span>
+                            <button onClick={() => setSharedBanner(null)} className="text-blue-400 hover:text-blue-600 text-lg leading-none">×</button>
+                        </div>
+                    )}
 
                     {/* Week summary */}
                     <div className="mb-6">
