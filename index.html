@@ -109,98 +109,160 @@
             return formatDate(mondayDate) === formatDate(getMonday(new Date()));
         }
 
-        // --- iOS-style Stacked Bar Chart ---
-        function WeekBarChart({ days }) {
+        // --- iOS Screen Time style Bar Chart ---
+        const DAY_SINGLE = { maandag: 'M', dinsdag: 'D', woensdag: 'W', donderdag: 'D', vrijdag: 'V' };
+
+        function WeekBarChart({ days, todayIndex }) {
             const maxHours = Math.max(HOURS_PER_DAY, ...DAYS.map(d => {
                 const dd = days[d] || { workHours: 0, freeHours: 0 };
                 return (parseFloat(dd.workHours) || 0) + (parseFloat(dd.freeHours) || 0);
             }));
-            const chartMax = Math.max(maxHours, HOURS_PER_DAY) + 1;
+            // Round up to nearest even number for clean Y-axis
+            const chartMax = Math.ceil((Math.max(maxHours, HOURS_PER_DAY) + 1) / 2) * 2;
+            const gridSteps = [];
+            for (let i = 0; i <= chartMax; i += Math.max(1, Math.floor(chartMax / 4))) {
+                gridSteps.push(i);
+            }
+            // Ensure chartMax is in gridSteps
+            if (gridSteps[gridSteps.length - 1] !== chartMax) gridSteps.push(chartMax);
+
             const targetPct = (HOURS_PER_DAY / chartMax) * 100;
-            const barAreaH = 108;
+            const barAreaH = 120;
 
             return (
                 <div className="w-full">
-                    {/* Chart area */}
-                    <div className="relative" style={{ height: `${barAreaH}px` }}>
-                        {/* Target line */}
-                        <div className="absolute left-0 right-0 flex items-center pointer-events-none"
-                            style={{ bottom: `${targetPct}%` }}>
-                            <div className="flex-1" style={{ height: '1px', background: 'var(--system-gray3)' }} />
-                            <span className="ml-2 flex-shrink-0" style={{ fontSize: '11px', color: 'var(--label-secondary)', fontWeight: 400 }}>{HOURS_PER_DAY}u</span>
-                        </div>
-
-                        {/* Bars */}
-                        <div className="flex items-end h-full" style={{ gap: '6px', paddingRight: '28px' }}>
-                            {DAYS.map(day => {
-                                const d = days[day] || { workHours: 0, freeHours: 0 };
-                                const work = parseFloat(d.workHours) || 0;
-                                const free = parseFloat(d.freeHours) || 0;
-                                const total = work + free;
-                                const overLimit = total > HOURS_PER_DAY;
-
-                                const workPx = chartMax > 0 ? (work / chartMax) * barAreaH : 0;
-                                const freePx = chartMax > 0 ? (free / chartMax) * barAreaH : 0;
-                                const totalPx = workPx + freePx;
-
-                                if (total === 0) return (
-                                    <div key={day} className="flex-1" />
-                                );
-
+                    {/* Chart container */}
+                    <div className="relative flex" style={{ height: `${barAreaH}px` }}>
+                        {/* Bar area */}
+                        <div className="relative flex-1">
+                            {/* Horizontal grid lines */}
+                            {gridSteps.map(step => {
+                                const pct = (step / chartMax) * 100;
                                 return (
-                                    <div key={day} className="flex-1 flex items-end">
-                                        {overLimit ? (
-                                            <div className="w-full" style={{
-                                                height: `${Math.max(totalPx, 4)}px`,
-                                                background: 'var(--system-red)',
-                                                borderRadius: '4px',
-                                                transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                                            }} />
-                                        ) : (
-                                            <div className="w-full flex flex-col-reverse" style={{
-                                                height: `${Math.max(totalPx, 4)}px`,
-                                                borderRadius: '4px',
-                                                overflow: 'hidden',
-                                                transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                                            }}>
-                                                {/* Work (bottom) */}
-                                                <div style={{
-                                                    height: work > 0 ? `${(work / total) * 100}%` : '0',
-                                                    background: 'var(--system-blue)',
-                                                    minHeight: work > 0 ? '2px' : '0'
-                                                }} />
-                                                {/* Free (top) */}
-                                                <div style={{
-                                                    height: free > 0 ? `${(free / total) * 100}%` : '0',
-                                                    background: 'var(--system-teal)',
-                                                    minHeight: free > 0 ? '2px' : '0'
-                                                }} />
-                                            </div>
-                                        )}
-                                    </div>
+                                    <div key={step} className="absolute left-0 right-0 pointer-events-none"
+                                        style={{ bottom: `${pct}%`, height: '0.5px', background: 'var(--system-gray5)' }} />
                                 );
                             })}
+
+                            {/* Target/average dashed line */}
+                            <div className="absolute left-0 right-0 pointer-events-none"
+                                style={{ bottom: `${targetPct}%`, zIndex: 2 }}>
+                                <div style={{
+                                    height: '1.5px',
+                                    backgroundImage: 'repeating-linear-gradient(to right, var(--system-green) 0, var(--system-green) 6px, transparent 6px, transparent 10px)',
+                                    backgroundSize: '10px 1.5px'
+                                }} />
+                            </div>
+
+                            {/* Bars */}
+                            <div className="flex items-end h-full" style={{ gap: '3px', padding: '0 2px' }}>
+                                {DAYS.map((day, i) => {
+                                    const d = days[day] || { workHours: 0, freeHours: 0 };
+                                    const work = parseFloat(d.workHours) || 0;
+                                    const free = parseFloat(d.freeHours) || 0;
+                                    const total = work + free;
+                                    const overLimit = total > HOURS_PER_DAY;
+                                    const isToday = i === todayIndex;
+
+                                    const workPx = chartMax > 0 ? (work / chartMax) * barAreaH : 0;
+                                    const freePx = chartMax > 0 ? (free / chartMax) * barAreaH : 0;
+                                    const totalPx = workPx + freePx;
+
+                                    if (total === 0) return (
+                                        <div key={day} className="flex-1" />
+                                    );
+
+                                    return (
+                                        <div key={day} className="flex-1 flex items-end">
+                                            {overLimit ? (
+                                                <div className="w-full" style={{
+                                                    height: `${Math.max(totalPx, 4)}px`,
+                                                    background: 'var(--system-red)',
+                                                    borderRadius: '3px 3px 0 0',
+                                                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                                                }} />
+                                            ) : (
+                                                <div className="w-full flex flex-col-reverse" style={{
+                                                    height: `${Math.max(totalPx, 4)}px`,
+                                                    borderRadius: '3px 3px 0 0',
+                                                    overflow: 'hidden',
+                                                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                                                }}>
+                                                    {/* Work (bottom) */}
+                                                    <div style={{
+                                                        height: work > 0 ? `${(work / total) * 100}%` : '0',
+                                                        background: isToday ? 'var(--system-blue)' : 'var(--system-teal)',
+                                                        opacity: isToday ? 1 : 0.6,
+                                                        minHeight: work > 0 ? '2px' : '0'
+                                                    }} />
+                                                    {/* Free (top) */}
+                                                    <div style={{
+                                                        height: free > 0 ? `${(free / total) * 100}%` : '0',
+                                                        background: isToday ? 'var(--system-blue)' : 'var(--system-teal)',
+                                                        opacity: isToday ? 0.5 : 0.3,
+                                                        minHeight: free > 0 ? '2px' : '0'
+                                                    }} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Y-axis labels (right side) */}
+                        <div className="relative flex-shrink-0" style={{ width: '32px', marginLeft: '4px' }}>
+                            {gridSteps.map(step => {
+                                const pct = (step / chartMax) * 100;
+                                return (
+                                    <span key={step} className="absolute right-0" style={{
+                                        bottom: `${pct}%`,
+                                        transform: 'translateY(50%)',
+                                        fontSize: '11px',
+                                        fontWeight: 400,
+                                        color: 'var(--label-secondary)',
+                                        lineHeight: 1
+                                    }}>
+                                        {step === 0 ? '0' : `${step} u`}
+                                    </span>
+                                );
+                            })}
+                            {/* Average label aligned with target line */}
+                            <span className="absolute right-0" style={{
+                                bottom: `${targetPct}%`,
+                                transform: 'translateY(-120%)',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                color: 'var(--system-green)',
+                                lineHeight: 1,
+                                whiteSpace: 'nowrap'
+                            }}>gemid.</span>
                         </div>
                     </div>
 
-                    {/* Day labels */}
-                    <div className="flex" style={{ paddingRight: '28px', marginTop: '6px' }}>
-                        {DAYS.map(day => (
-                            <div key={day} className="flex-1 text-center" style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)' }}>
-                                {DAY_SHORT[day]}
+                    {/* Day labels (single letter) */}
+                    <div className="flex" style={{ marginTop: '6px', paddingRight: '36px' }}>
+                        {DAYS.map((day, i) => (
+                            <div key={day} className="flex-1 text-center" style={{
+                                fontSize: '11px',
+                                fontWeight: 400,
+                                color: i === todayIndex ? 'var(--label-primary)' : 'var(--label-secondary)',
+                                lineHeight: '16px'
+                            }}>
+                                {DAY_SINGLE[day]}
                             </div>
                         ))}
                     </div>
 
                     {/* Legend */}
-                    <div className="flex items-center justify-center gap-4" style={{ marginTop: '12px' }}>
+                    <div className="flex items-center gap-4" style={{ marginTop: '12px' }}>
                         <div className="flex items-center gap-1.5">
                             <div className="rounded-full" style={{ width: '8px', height: '8px', background: 'var(--system-blue)' }} />
-                            <span style={{ fontSize: '11px', color: 'var(--label-secondary)' }}>Werk</span>
+                            <span style={{ fontSize: '11px', color: 'var(--label-secondary)', lineHeight: '16px' }}>Werk</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <div className="rounded-full" style={{ width: '8px', height: '8px', background: 'var(--system-teal)' }} />
-                            <span style={{ fontSize: '11px', color: 'var(--label-secondary)' }}>Vrij</span>
+                            <div className="rounded-full" style={{ width: '8px', height: '8px', background: 'var(--system-teal)', opacity: 0.5 }} />
+                            <span style={{ fontSize: '11px', color: 'var(--label-secondary)', lineHeight: '16px' }}>Vrij</span>
                         </div>
                     </div>
                 </div>
@@ -234,8 +296,8 @@
             );
         }
 
-        // --- Week Summary ---
-        function WeekSummary({ days }) {
+        // --- Week Summary (iOS Screen Time style) ---
+        function WeekSummary({ days, todayIndex }) {
             let totalWork = 0, totalFree = 0, approvedDays = 0;
 
             DAYS.forEach(day => {
@@ -253,46 +315,59 @@
             const isEmpty = totalHours === 0;
             const overLimit = totalHours > weekTarget;
 
-            const heroColor = overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-primary)';
-
             return (
                 <div className="rounded-2xl shadow-sm" style={{ background: 'var(--card-bg)', padding: '20px' }}>
-                    {/* Hero stat */}
-                    <div className="flex items-baseline gap-2" style={{ marginBottom: '20px' }}>
-                        <span className="text-3xl font-bold tracking-tight" style={{ color: heroColor }}>
-                            {fmt(totalHours)}
-                        </span>
-                        <span style={{ fontSize: '15px', color: 'var(--label-secondary)' }}>/ {weekTarget} uur</span>
-                        <span className="ml-auto font-semibold tabular-nums" style={{ fontSize: '15px', color: overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-secondary)' }}>
-                            {pct}%
-                        </span>
+                    {/* Hero stat — iOS Screen Time pattern: label on top, value below, comparison right */}
+                    <div className="flex items-end justify-between" style={{ marginBottom: '20px' }}>
+                        <div>
+                            <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '2px' }}>
+                                Totaal deze week
+                            </p>
+                            <span style={{
+                                fontSize: '34px',
+                                fontWeight: 700,
+                                color: overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-primary)',
+                                letterSpacing: '-0.4px',
+                                lineHeight: '41px'
+                            }}>
+                                {fmt(totalHours)} <span style={{ fontSize: '22px', fontWeight: 400 }}>uur</span>
+                            </span>
+                        </div>
+                        <div className="text-right" style={{ paddingBottom: '4px' }}>
+                            <span className="tabular-nums" style={{
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                color: overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-secondary)',
+                                lineHeight: '18px'
+                            }}>
+                                {pct}% van {weekTarget}u
+                            </span>
+                        </div>
                     </div>
 
                     {/* Bar chart */}
                     {isEmpty ? (
                         <div className="flex items-center justify-center" style={{ padding: '32px 0' }}>
-                            <p style={{ fontSize: '15px', color: 'var(--label-tertiary)' }}>Vul je uren in om je voortgang te zien</p>
+                            <p style={{ fontSize: '15px', color: 'var(--label-tertiary)', lineHeight: '20px' }}>Vul je uren in om je voortgang te zien</p>
                         </div>
                     ) : (
-                        <WeekBarChart days={days} />
+                        <WeekBarChart days={days} todayIndex={todayIndex} />
                     )}
 
-                    {/* Stats row */}
-                    <div className="flex items-center justify-between" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--system-gray5)' }}>
-                        <div className="flex" style={{ gap: '20px' }}>
-                            <div>
-                                <span className="font-semibold" style={{ fontSize: '15px', color: 'var(--label-primary)' }}>{fmt(totalWork)}</span>
-                                <span style={{ fontSize: '13px', color: 'var(--label-secondary)', marginLeft: '4px' }}>werk</span>
-                            </div>
-                            <div>
-                                <span className="font-semibold" style={{ fontSize: '15px', color: 'var(--label-primary)' }}>{fmt(totalFree)}</span>
-                                <span style={{ fontSize: '13px', color: 'var(--label-secondary)', marginLeft: '4px' }}>vrij</span>
-                            </div>
+                    {/* Bottom stats — stacked like iOS Screen Time */}
+                    <div className="flex" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '0.5px solid var(--system-gray5)', gap: '24px' }}>
+                        <div>
+                            <p style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '13px', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Werk</p>
+                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--label-primary)', lineHeight: '28px' }}>{fmt(totalWork)}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-secondary)' }}> u</span></span>
                         </div>
-                        <span className="inline-flex items-center rounded-full" style={{ gap: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--label-secondary)', background: 'var(--system-gray6)', padding: '3px 10px' }}>
-                            <span className="rounded-full" style={{ width: '6px', height: '6px', background: approvedDays >= 5 ? 'var(--system-green)' : 'var(--system-gray3)' }} />
-                            {approvedDays}/5 dagen
-                        </span>
+                        <div>
+                            <p style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '13px', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Vrij</p>
+                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--label-primary)', lineHeight: '28px' }}>{fmt(totalFree)}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-secondary)' }}> u</span></span>
+                        </div>
+                        <div className="ml-auto text-right">
+                            <p style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '13px', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Dagen</p>
+                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: approvedDays >= 5 ? 'var(--system-green)' : 'var(--label-primary)', lineHeight: '28px' }}>{approvedDays}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-secondary)' }}> /5</span></span>
+                        </div>
                     </div>
                 </div>
             );
@@ -494,26 +569,26 @@
             const weekLabel = `${currentMonday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} \u2014 ${weekEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
             return (
-                <div className="max-w-xl mx-auto py-6 pb-12 sm:max-w-7xl sm:py-8" style={{ padding: '24px 16px 48px' }}>
+                <div className="max-w-xl mx-auto sm:max-w-7xl" style={{ padding: '16px 16px 48px' }}>
                     <Toast message="Link gekopieerd" visible={toastVisible} />
 
-                    {/* Header */}
-                    <div className="flex items-center justify-between" style={{ marginBottom: '4px' }}>
-                        <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--label-primary)' }}>Weekplanner</h1>
+                    {/* Header — iOS large title style */}
+                    <div className="flex items-center justify-between" style={{ marginBottom: '2px' }}>
+                        <h1 style={{ fontSize: '34px', fontWeight: 700, color: 'var(--label-primary)', letterSpacing: '0.37px', lineHeight: '41px' }}>Weekplanner</h1>
                         <button onClick={shareWeek}
                             className="flex items-center justify-center rounded-full active:scale-90 transition-all"
                             style={{ width: '44px', height: '44px' }}
                             title="Deel week">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--label-secondary)' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--system-blue)' }}>
                                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
                             </svg>
                         </button>
                     </div>
 
-                    <p style={{ fontSize: '13px', color: 'var(--label-secondary)', marginBottom: '16px' }}>{weekLabel}</p>
+                    <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '16px' }}>{weekLabel}</p>
 
                     {/* Navigation */}
-                    <div className="flex justify-center" style={{ marginBottom: '24px' }}>
+                    <div className="flex justify-center" style={{ marginBottom: '20px' }}>
                         <SegmentedControl
                             onPrev={() => goWeek(-1)}
                             onToday={goToday}
@@ -523,9 +598,12 @@
                     </div>
 
                     {/* Week summary */}
-                    <div style={{ marginBottom: '16px' }}>
-                        <WeekSummary days={weekData} />
+                    <div style={{ marginBottom: '24px' }}>
+                        <WeekSummary days={weekData} todayIndex={todayIndex} />
                     </div>
+
+                    {/* Section header — iOS outside-card section label */}
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--label-secondary)', lineHeight: '18px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', paddingLeft: '4px' }}>Uren per dag</p>
 
                     {/* Day cards */}
                     <div className="flex flex-col sm:flex-row" style={{ gap: '10px' }}>
