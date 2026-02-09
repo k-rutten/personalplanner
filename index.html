@@ -330,23 +330,29 @@
                             <p style={{ fontSize: '15px', color: 'var(--label-tertiary)', lineHeight: '20px' }}>Vul je uren in om je voortgang te zien</p>
                         </div>
                     ) : (
-                        <WeekBarChart days={days} todayIndex={todayIndex} />
+                        <WeekBarChart days={days} />
                     )}
 
-                    {/* Bottom stats — colored to match bar segments (acts as legend) */}
-                    <div className="flex" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '0.5px solid var(--system-gray5)', gap: '24px' }}>
+                    {/* Category stats — colored name (legend), value below in black */}
+                    <div className="flex" style={{ marginTop: '16px', gap: '24px' }}>
                         <div>
-                            <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '1px' }}>Werk</p>
-                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--system-blue)', lineHeight: '28px' }}>{fmt(totalWork)}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--system-blue)', opacity: 0.7 }}> u</span></span>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--system-blue)', lineHeight: '18px', marginBottom: '1px' }}>Werk</p>
+                            <span className="tabular-nums" style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-primary)', lineHeight: '20px' }}>{fmt(totalWork)} uur</span>
                         </div>
                         <div>
-                            <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '1px' }}>Vrij</p>
-                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--system-teal)', lineHeight: '28px' }}>{fmt(totalFree)}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--system-teal)', opacity: 0.7 }}> u</span></span>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--system-teal)', lineHeight: '18px', marginBottom: '1px' }}>Vrij</p>
+                            <span className="tabular-nums" style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-primary)', lineHeight: '20px' }}>{fmt(totalFree)} uur</span>
                         </div>
-                        <div className="ml-auto text-right">
-                            <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '1px' }}>Dagen</p>
-                            <span className="tabular-nums" style={{ fontSize: '22px', fontWeight: 700, color: approvedDays >= 5 ? 'var(--system-green)' : 'var(--label-primary)', lineHeight: '28px' }}>{approvedDays}<span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-secondary)' }}> /5</span></span>
+                        <div>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: approvedDays >= 5 ? 'var(--system-green)' : 'var(--label-secondary)', lineHeight: '18px', marginBottom: '1px' }}>Dagen</p>
+                            <span className="tabular-nums" style={{ fontSize: '15px', fontWeight: 400, color: 'var(--label-primary)', lineHeight: '20px' }}>{approvedDays}/5</span>
                         </div>
+                    </div>
+
+                    {/* Totaal row — like "Totale schermtijd" */}
+                    <div className="flex items-center justify-between" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '0.5px solid var(--system-gray5)' }}>
+                        <span style={{ fontSize: '17px', fontWeight: 600, color: 'var(--label-primary)', lineHeight: '22px' }}>Totaal uren</span>
+                        <span className="tabular-nums" style={{ fontSize: '17px', fontWeight: 400, color: 'var(--label-primary)', lineHeight: '22px' }}>{fmt(totalHours)} uur</span>
                     </div>
                 </div>
             );
