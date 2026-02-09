@@ -176,11 +176,14 @@
                     </div>
 
                     {/* Progress bar */}
-                    <div className="mt-4 bg-gray-100 rounded-full h-3 overflow-hidden">
-                        <div
-                            className={`h-full rounded-full transition-all duration-500 ${totalHours >= weekTarget ? 'bg-green-500' : 'bg-blue-500'}`}
-                            style={{ width: `${pct}%` }}
-                        />
+                    <div className="mt-4 flex items-center gap-3">
+                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ${totalHours >= weekTarget ? 'bg-green-500' : 'bg-blue-500'}`}
+                                style={{ width: `${pct}%` }}
+                            />
+                        </div>
+                        <span className={`text-sm font-medium min-w-[3rem] text-right ${totalHours >= weekTarget ? 'text-green-600' : 'text-gray-500'}`}>{Math.round(pct)}%</span>
                     </div>
                 </div>
             );
