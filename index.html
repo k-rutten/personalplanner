@@ -2,16 +2,39 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Weekplanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
     <style>
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
+        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .ring-progress { transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toast-out {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+        }
+        .toast-enter { animation: toast-in 0.25s ease-out forwards; }
+        .toast-exit { animation: toast-out 0.2s ease-in forwards; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="min-h-screen" style="background: #f5f5f7;">
     <div id="root"></div>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -23,7 +46,6 @@
 
         const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag'];
         const DAY_LABELS = { maandag: 'Maandag', dinsdag: 'Dinsdag', woensdag: 'Woensdag', donderdag: 'Donderdag', vrijdag: 'Vrijdag' };
-        const DAY_SHORT = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr' };
         const HOURS_PER_DAY = 8;
         const STORAGE_KEY = 'weekplanner_data';
 
@@ -36,9 +58,8 @@
             return d;
         }
 
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
-        }
+        const formatDate = (date) => date.toISOString().split('T')[0];
+        const fmt = (n) => Number.isInteger(n) ? n : n.toFixed(1);
 
         function getDayDate(mondayDate, dayIndex) {
             const d = new Date(mondayDate);
@@ -48,105 +69,82 @@
 
         function createEmptyWeek() {
             const days = {};
-            DAYS.forEach(day => {
-                days[day] = { workHours: 0, freeHours: 0 };
-            });
+            DAYS.forEach(day => { days[day] = { workHours: 0, freeHours: 0 }; });
             return days;
         }
 
         function loadAllData() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                return raw ? JSON.parse(raw) : {};
-            } catch { return {}; }
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+            catch { return {}; }
         }
 
-        function saveAllData(data) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        }
+        const saveAllData = (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
         function encodeWeekToURL(weekKey, weekData) {
-            const payload = { week: weekKey, days: weekData };
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ week: weekKey, days: weekData }))));
             return window.location.origin + window.location.pathname + '?d=' + encoded;
         }
 
         function decodeWeekFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            const encoded = params.get('d');
+            const encoded = new URLSearchParams(window.location.search).get('d');
             if (!encoded) return null;
-            try {
-                const json = decodeURIComponent(escape(atob(encoded)));
-                return JSON.parse(json);
-            } catch { return null; }
+            try { return JSON.parse(decodeURIComponent(escape(atob(encoded)))); }
+            catch { return null; }
         }
 
-        const fmt = (n) => Number.isInteger(n) ? n : n.toFixed(1);
+        function isCurrentWeek(mondayDate) {
+            return formatDate(mondayDate) === formatDate(getMonday(new Date()));
+        }
 
-        // --- Components ---
-
-        function DayCard({ day, dayIndex, mondayDate, data, onChange }) {
-            const workHours = parseFloat(data.workHours) || 0;
-            const freeHours = parseFloat(data.freeHours) || 0;
-            const totalDay = workHours + freeHours;
-            const approved = totalDay >= HOURS_PER_DAY;
-
-            const setWork = (val) => onChange(day, { ...data, workHours: val });
-            const setFree = (val) => onChange(day, { ...data, freeHours: val });
+        // --- Circular Progress Ring ---
+        function ProgressRing({ pct, size = 120, stroke = 8 }) {
+            const radius = (size - stroke) / 2;
+            const circumference = 2 * Math.PI * radius;
+            const offset = circumference - (Math.min(pct, 100) / 100) * circumference;
+            const color = pct >= 100 ? '#22c55e' : '#007AFF';
 
             return (
-                <div className={`bg-white rounded-xl shadow-sm border overflow-hidden ${approved ? 'border-green-200' : 'border-gray-200'} sm:min-w-[180px] sm:flex-1`}>
-                    {/* Header */}
-                    <div className={`flex items-center justify-between px-4 py-2.5 sm:flex-col sm:py-3 sm:text-center sm:border-b ${approved ? 'bg-green-50 border-b border-green-200' : 'bg-gray-50 border-b border-gray-200'}`}>
-                        <div>
-                            <span className="font-semibold text-gray-800">{DAY_LABELS[day]}</span>
-                            <span className="text-xs text-gray-400 ml-1.5 sm:ml-0 sm:block">{getDayDate(mondayDate, dayIndex)}</span>
-                        </div>
-                        <div className={`text-sm font-medium ${approved ? 'text-green-600' : 'text-orange-500'}`}>
-                            {fmt(totalDay)}/{HOURS_PER_DAY}u {approved ? '\u2713' : ''}
-                        </div>
-                    </div>
+                <svg width={size} height={size} className="block">
+                    <circle cx={size/2} cy={size/2} r={radius} fill="none"
+                        stroke="#f0f0f0" strokeWidth={stroke} />
+                    <circle cx={size/2} cy={size/2} r={radius} fill="none"
+                        stroke={color} strokeWidth={stroke} strokeLinecap="round"
+                        strokeDasharray={circumference} strokeDashoffset={offset}
+                        className="ring-progress"
+                        style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }} />
+                </svg>
+            );
+        }
 
-                    {/* Inputs */}
-                    <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-1 sm:gap-3">
-                        <div className="bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
-                            <label className="text-xs text-blue-600 font-medium block mb-1">Werk</label>
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="number"
-                                    value={workHours || ''}
-                                    onChange={e => setWork(parseFloat(e.target.value) || 0)}
-                                    placeholder="0"
-                                    min="0" max="24" step="0.5"
-                                    className="w-full text-lg sm:text-base font-semibold text-center py-1 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                                />
-                                <span className="text-xs text-blue-400">u</span>
-                            </div>
-                        </div>
+        // --- Toast ---
+        function Toast({ message, visible }) {
+            const [show, setShow] = useState(false);
+            const [exiting, setExiting] = useState(false);
 
-                        <div className="bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
-                            <label className="text-xs text-amber-600 font-medium block mb-1">Vrij</label>
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="number"
-                                    value={freeHours || ''}
-                                    onChange={e => setFree(parseFloat(e.target.value) || 0)}
-                                    placeholder="0"
-                                    min="0" max="8" step="0.5"
-                                    className="w-full text-lg sm:text-base font-semibold text-center py-1 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                                />
-                                <span className="text-xs text-amber-400">u</span>
-                            </div>
-                        </div>
+            useEffect(() => {
+                if (visible) {
+                    setShow(true);
+                    setExiting(false);
+                } else if (show) {
+                    setExiting(true);
+                    const t = setTimeout(() => { setShow(false); setExiting(false); }, 200);
+                    return () => clearTimeout(t);
+                }
+            }, [visible]);
+
+            if (!show) return null;
+            return (
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+                    <div className={`px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-full shadow-lg ${exiting ? 'toast-exit' : 'toast-enter'}`}>
+                        {message}
                     </div>
                 </div>
             );
         }
 
+        // --- Week Summary ---
         function WeekSummary({ days }) {
-            let totalWork = 0;
-            let totalFree = 0;
-            let approvedDays = 0;
+            let totalWork = 0, totalFree = 0, approvedDays = 0;
 
             DAYS.forEach(day => {
                 const d = days[day] || { workHours: 0, freeHours: 0 };
@@ -160,92 +158,203 @@
             const totalHours = totalWork + totalFree;
             const weekTarget = HOURS_PER_DAY * 5;
             const pct = weekTarget > 0 ? Math.round((totalHours / weekTarget) * 100) : 0;
-            const barPct = Math.min(pct, 100);
+            const isEmpty = totalHours === 0;
 
             return (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-5">
-                    {/* Mobile: compact grid / Desktop: spread row */}
-                    <div className="flex items-center justify-between gap-3 sm:gap-4">
-                        <div className="hidden sm:block">
-                            <h2 className="text-lg font-semibold text-gray-800">Weektotaal</h2>
-                            <p className="text-sm text-gray-500 mt-0.5">
-                                {approvedDays} van 5 dagen voltooid
-                            </p>
+                <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-between">
+                        {/* Ring */}
+                        <div className="relative">
+                            <ProgressRing pct={pct} size={112} stroke={10} />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className={`text-2xl font-bold tracking-tight ${pct >= 100 ? 'text-green-500' : 'text-gray-900'}`}>{pct}%</span>
+                            </div>
                         </div>
 
-                        <div className="flex gap-4 sm:gap-6 flex-1 sm:flex-none justify-between sm:justify-end">
-                            <div className="text-center">
-                                <div className="text-xl sm:text-2xl font-bold text-blue-600">{fmt(totalWork)}</div>
-                                <div className="text-[10px] sm:text-xs text-gray-500">/ {weekTarget}u werk</div>
+                        {/* Stats or empty state */}
+                        {isEmpty ? (
+                            <div className="text-center sm:text-left flex-1">
+                                <p className="text-sm text-gray-400">Vul je uren in om je voortgang te zien</p>
                             </div>
-                            <div className="text-center">
-                                <div className="text-xl sm:text-2xl font-bold text-amber-500">{fmt(totalFree)}</div>
-                                <div className="text-[10px] sm:text-xs text-gray-500">vrije uren</div>
+                        ) : (
+                            <div className="flex gap-8 sm:gap-10">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalWork)}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">werkuren</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalFree)}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">vrij</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalHours)}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">/ {weekTarget}u</div>
+                                </div>
                             </div>
-                            <div className="text-center">
-                                <div className={`text-xl sm:text-2xl font-bold ${pct >= 100 ? 'text-green-600' : 'text-gray-700'}`}>{pct}%</div>
-                                <div className="text-[10px] sm:text-xs text-gray-500">{fmt(totalHours)} / {weekTarget}u</div>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
-                    {/* Progress bar */}
-                    <div className="mt-3 sm:mt-4 flex items-center gap-2 sm:gap-3">
-                        <div className="flex-1 bg-gray-100 rounded-full h-2.5 sm:h-3 overflow-hidden">
-                            <div
-                                className={`h-full rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
-                                style={{ width: `${barPct}%` }}
-                            />
-                        </div>
-                        <span className={`text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-right ${pct >= 100 ? 'text-green-600' : 'text-gray-500'}`}>{pct}%</span>
+                    {/* Days badge */}
+                    <div className="mt-4 flex justify-center sm:justify-start">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                            <span className={`w-1.5 h-1.5 rounded-full ${approvedDays >= 5 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                            {approvedDays} van 5 dagen
+                        </span>
                     </div>
-
-                    {/* Mobile subtitle */}
-                    <p className="sm:hidden text-xs text-gray-400 mt-2 text-center">
-                        {approvedDays} van 5 dagen voltooid
-                    </p>
                 </div>
             );
         }
 
+        // --- Number Input (fix #6: proper zero handling) ---
+        function HoursInput({ value, onChange, max }) {
+            const [focused, setFocused] = useState(false);
+            const [localValue, setLocalValue] = useState('');
+
+            useEffect(() => {
+                if (!focused) setLocalValue(value ? String(value) : '');
+            }, [value, focused]);
+
+            const handleChange = (e) => {
+                const raw = e.target.value;
+                setLocalValue(raw);
+                const parsed = parseFloat(raw);
+                onChange(isNaN(parsed) ? 0 : Math.min(parsed, max));
+            };
+
+            const handleBlur = () => {
+                setFocused(false);
+                if (localValue === '' || localValue === '-') {
+                    onChange(0);
+                    setLocalValue('');
+                }
+            };
+
+            return (
+                <input
+                    type="number"
+                    value={focused ? localValue : (value || '')}
+                    onChange={handleChange}
+                    onFocus={() => { setFocused(true); setLocalValue(value ? String(value) : ''); }}
+                    onBlur={handleBlur}
+                    placeholder="0"
+                    min="0" max={max} step="0.5"
+                    className="w-full h-12 text-center text-lg font-semibold text-gray-900 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-sm transition-all"
+                />
+            );
+        }
+
+        // --- Day Card ---
+        function DayCard({ day, dayIndex, mondayDate, data, onChange, isToday }) {
+            const workHours = parseFloat(data.workHours) || 0;
+            const freeHours = parseFloat(data.freeHours) || 0;
+            const totalDay = workHours + freeHours;
+            const approved = totalDay >= HOURS_PER_DAY;
+            const dayPct = Math.min((totalDay / HOURS_PER_DAY) * 100, 100);
+
+            const setWork = (val) => onChange(day, { ...data, workHours: val });
+            const setFree = (val) => onChange(day, { ...data, freeHours: val });
+
+            return (
+                <div className={`bg-white rounded-2xl shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md sm:flex-1 relative ${isToday ? 'ring-2 ring-blue-500/20' : ''}`}>
+                    {/* Approved accent — inner bar that doesn't break radius */}
+                    {approved && (
+                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400 rounded-l-2xl sm:w-full sm:h-1 sm:rounded-t-2xl sm:rounded-l-none" />
+                    )}
+
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 sm:flex-col sm:items-center sm:gap-0.5 sm:pt-4 sm:pb-3">
+                        <div className="flex items-center gap-2 sm:flex-col sm:items-center">
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${approved ? 'bg-green-400' : 'bg-gray-200'}`} />
+                                <span className="font-semibold text-gray-900">{DAY_LABELS[day]}</span>
+                            </div>
+                            <span className="text-xs text-gray-400">{getDayDate(mondayDate, dayIndex)}</span>
+                        </div>
+                        <span className={`text-sm font-semibold tabular-nums transition-colors duration-300 ${approved ? 'text-green-500' : 'text-gray-300'}`}>
+                            {fmt(totalDay)}/{HOURS_PER_DAY}u
+                        </span>
+                    </div>
+
+                    {/* Inputs */}
+                    <div className="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-1">
+                        <div>
+                            <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-1.5">Werk</label>
+                            <HoursInput value={workHours} onChange={setWork} max={24} />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-1.5">Vrij</label>
+                            <HoursInput value={freeHours} onChange={setFree} max={8} />
+                        </div>
+                    </div>
+
+                    {/* Day progress */}
+                    <div className="h-1 bg-gray-100">
+                        <div
+                            className={`h-full transition-all duration-500 ${approved ? 'bg-green-400' : dayPct > 0 ? 'bg-blue-400' : ''}`}
+                            style={{ width: `${dayPct}%` }}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        // --- Segmented Control ---
+        function SegmentedControl({ onPrev, onToday, onNext, isCurrent }) {
+            return (
+                <div className="inline-flex bg-gray-200/60 rounded-xl p-1 gap-0.5">
+                    <button onClick={onPrev}
+                        className="w-11 h-11 flex items-center justify-center text-sm font-medium text-gray-500 rounded-lg active:scale-95 active:bg-white/60 transition-all hover:text-gray-900">
+                        &larr;
+                    </button>
+                    <button onClick={onToday}
+                        className={`px-5 h-11 text-sm font-medium rounded-lg active:scale-95 transition-all ${isCurrent ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>
+                        Vandaag
+                    </button>
+                    <button onClick={onNext}
+                        className="w-11 h-11 flex items-center justify-center text-sm font-medium text-gray-500 rounded-lg active:scale-95 active:bg-white/60 transition-all hover:text-gray-900">
+                        &rarr;
+                    </button>
+                </div>
+            );
+        }
+
+        // --- App ---
         function App() {
             const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
             const [allData, setAllData] = useState(() => loadAllData());
-            const [copied, setCopied] = useState(false);
-            const [sharedBanner, setSharedBanner] = useState(null);
+            const [toastVisible, setToastVisible] = useState(false);
 
             const weekKey = formatDate(currentMonday);
             const weekData = allData[weekKey] || createEmptyWeek();
+            const isCurrent = isCurrentWeek(currentMonday);
+
+            // Determine today's day index (0=mon, 4=fri, -1=weekend)
+            const todayDate = new Date();
+            const todayDayOfWeek = todayDate.getDay();
+            const todayIndex = isCurrent && todayDayOfWeek >= 1 && todayDayOfWeek <= 5 ? todayDayOfWeek - 1 : -1;
 
             useEffect(() => {
                 const shared = decodeWeekFromURL();
                 if (shared && shared.week && shared.days) {
                     setAllData(prev => ({ ...prev, [shared.week]: shared.days }));
                     setCurrentMonday(new Date(shared.week));
-                    setSharedBanner(shared.week);
                     window.history.replaceState({}, '', window.location.pathname);
                 }
             }, []);
 
-            useEffect(() => {
-                saveAllData(allData);
-            }, [allData]);
+            useEffect(() => { saveAllData(allData); }, [allData]);
 
             const shareWeek = () => {
-                const url = encodeWeekToURL(weekKey, weekData);
-                navigator.clipboard.writeText(url).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
+                navigator.clipboard.writeText(encodeWeekToURL(weekKey, weekData)).then(() => {
+                    setToastVisible(true);
+                    setTimeout(() => setToastVisible(false), 1800);
                 });
             };
 
             const handleDayChange = useCallback((day, newDayData) => {
                 setAllData(prev => ({
                     ...prev,
-                    [weekKey]: {
-                        ...(prev[weekKey] || createEmptyWeek()),
-                        [day]: newDayData,
-                    }
+                    [weekKey]: { ...(prev[weekKey] || createEmptyWeek()), [day]: newDayData }
                 }));
             }, [weekKey]);
 
@@ -259,50 +368,43 @@
 
             const weekEnd = new Date(currentMonday);
             weekEnd.setDate(weekEnd.getDate() + 4);
-
             const weekLabel = `${currentMonday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} \u2014 ${weekEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
             return (
-                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-                    {/* Header */}
-                    <div className="mb-4 sm:mb-6">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Weekplanner</h1>
-                            <button onClick={shareWeek} className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm rounded-lg transition shadow-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
-                                {copied ? 'Gekopieerd!' : 'Deel'}
-                            </button>
-                        </div>
-                        <p className="text-xs sm:text-sm text-gray-500">{weekLabel}</p>
+                <div className="max-w-xl mx-auto px-4 py-6 pb-12 sm:max-w-7xl sm:py-8">
+                    <Toast message="Link gekopieerd" visible={toastVisible} />
 
-                        {/* Navigation */}
-                        <div className="flex items-center gap-2 mt-3">
-                            <button onClick={() => goWeek(-1)} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm text-center">
-                                ← Vorige
-                            </button>
-                            <button onClick={goToday} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-center">
-                                Vandaag
-                            </button>
-                            <button onClick={() => goWeek(1)} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm text-center">
-                                Volgende →
-                            </button>
-                        </div>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-1">
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Weekplanner</h1>
+                        <button onClick={shareWeek}
+                            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-200/60 active:scale-90 transition-all"
+                            title="Deel week">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
+                            </svg>
+                        </button>
                     </div>
 
-                    {/* Shared banner */}
-                    {sharedBanner && (
-                        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-3 sm:px-4 py-2 flex items-center justify-between">
-                            <span className="text-xs sm:text-sm text-blue-700">Gedeelde weekplanning geladen en opgeslagen.</span>
-                            <button onClick={() => setSharedBanner(null)} className="text-blue-400 hover:text-blue-600 text-lg leading-none ml-2">&times;</button>
-                        </div>
-                    )}
+                    <p className="text-sm text-gray-400 mb-4">{weekLabel}</p>
+
+                    {/* Navigation */}
+                    <div className="flex justify-center mb-6">
+                        <SegmentedControl
+                            onPrev={() => goWeek(-1)}
+                            onToday={goToday}
+                            onNext={() => goWeek(1)}
+                            isCurrent={isCurrent}
+                        />
+                    </div>
 
                     {/* Week summary */}
-                    <div className="mb-4 sm:mb-6">
+                    <div className="mb-6">
                         <WeekSummary days={weekData} />
                     </div>
 
-                    {/* Day cards: 2-col grid on mobile, row on desktop */}
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:gap-3">
+                    {/* Day cards */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:gap-3">
                         {DAYS.map((day, i) => (
                             <DayCard
                                 key={day}
@@ -311,6 +413,7 @@
                                 mondayDate={currentMonday}
                                 data={weekData[day] || { workHours: 0, freeHours: 0 }}
                                 onChange={handleDayChange}
+                                isToday={i === todayIndex}
                             />
                         ))}
                     </div>
