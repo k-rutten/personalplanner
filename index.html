@@ -119,9 +119,9 @@
             }));
             // Round up to nearest even number, ensure headroom above target
             const chartMax = Math.ceil((Math.max(maxHours, HOURS_PER_DAY) + 2) / 2) * 2;
-            // Only 3 grid steps: 0, mid, top — like iOS
-            const midStep = chartMax / 2;
-            const gridSteps = [0, midStep, chartMax];
+            // Grid lines every 2 hours: 0, 2, 4, 6, 8, 10...
+            const gridSteps = [];
+            for (let i = 0; i <= chartMax; i += 2) gridSteps.push(i);
 
             const targetPct = (HOURS_PER_DAY / chartMax) * 100;
             const barAreaH = 120;
