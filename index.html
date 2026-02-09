@@ -19,10 +19,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo } = React;
+        const { useState, useEffect, useCallback } = React;
 
         const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag'];
         const DAY_LABELS = { maandag: 'Maandag', dinsdag: 'Dinsdag', woensdag: 'Woensdag', donderdag: 'Donderdag', vrijdag: 'Vrijdag' };
+        const DAY_SHORT = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr' };
         const HOURS_PER_DAY = 8;
         const STORAGE_KEY = 'weekplanner_data';
 
@@ -80,9 +81,11 @@
             } catch { return null; }
         }
 
+        const fmt = (n) => Number.isInteger(n) ? n : n.toFixed(1);
+
         // --- Components ---
 
-        function DayColumn({ day, dayIndex, mondayDate, data, onChange }) {
+        function DayCard({ day, dayIndex, mondayDate, data, onChange }) {
             const workHours = parseFloat(data.workHours) || 0;
             const freeHours = parseFloat(data.freeHours) || 0;
             const totalDay = workHours + freeHours;
@@ -92,55 +95,48 @@
             const setFree = (val) => onChange(day, { ...data, freeHours: val });
 
             return (
-                <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-w-[180px] flex-1">
+                <div className={`bg-white rounded-xl shadow-sm border overflow-hidden ${approved ? 'border-green-200' : 'border-gray-200'} sm:min-w-[180px] sm:flex-1`}>
                     {/* Header */}
-                    <div className={`px-4 py-3 text-center border-b ${approved ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-                        <div className="font-semibold text-gray-800">{DAY_LABELS[day]}</div>
-                        <div className="text-xs text-gray-500">{getDayDate(mondayDate, dayIndex)}</div>
-                        <div className={`mt-1 text-sm font-medium ${approved ? 'text-green-600' : 'text-orange-500'}`}>
-                            {Number.isInteger(totalDay) ? totalDay : totalDay.toFixed(1)} / {HOURS_PER_DAY}u {approved ? '\u2713' : ''}
+                    <div className={`flex items-center justify-between px-4 py-2.5 sm:flex-col sm:py-3 sm:text-center sm:border-b ${approved ? 'bg-green-50 border-b border-green-200' : 'bg-gray-50 border-b border-gray-200'}`}>
+                        <div>
+                            <span className="font-semibold text-gray-800">{DAY_LABELS[day]}</span>
+                            <span className="text-xs text-gray-400 ml-1.5 sm:ml-0 sm:block">{getDayDate(mondayDate, dayIndex)}</span>
+                        </div>
+                        <div className={`text-sm font-medium ${approved ? 'text-green-600' : 'text-orange-500'}`}>
+                            {fmt(totalDay)}/{HOURS_PER_DAY}u {approved ? '\u2713' : ''}
                         </div>
                     </div>
 
-                    {/* Work hours */}
-                    <div className="flex-1 p-3 space-y-3">
-                        <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-3 border border-blue-100">
-                            <span className="text-sm text-blue-700 font-medium whitespace-nowrap flex-1">Werk</span>
-                            <input
-                                type="number"
-                                value={workHours || ''}
-                                onChange={e => setWork(parseFloat(e.target.value) || 0)}
-                                placeholder="0"
-                                min="0"
-                                max="24"
-                                step="0.5"
-                                className="w-16 text-sm text-center px-1 py-1.5 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                            />
-                            <span className="text-xs text-blue-500">uur</span>
+                    {/* Inputs */}
+                    <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-1 sm:gap-3">
+                        <div className="bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
+                            <label className="text-xs text-blue-600 font-medium block mb-1">Werk</label>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    value={workHours || ''}
+                                    onChange={e => setWork(parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    min="0" max="24" step="0.5"
+                                    className="w-full text-lg sm:text-base font-semibold text-center py-1 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                />
+                                <span className="text-xs text-blue-400">u</span>
+                            </div>
                         </div>
 
-                        {/* Free hours */}
-                        <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-3 border border-amber-100">
-                            <span className="text-sm text-amber-700 font-medium whitespace-nowrap flex-1">Vrij</span>
-                            <input
-                                type="number"
-                                value={freeHours || ''}
-                                onChange={e => setFree(parseFloat(e.target.value) || 0)}
-                                placeholder="0"
-                                min="0"
-                                max="8"
-                                step="0.5"
-                                className="w-16 text-sm text-center px-1 py-1.5 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                            />
-                            <span className="text-xs text-amber-500">uur</span>
-                        </div>
-                    </div>
-
-                    {/* Day summary */}
-                    <div className={`px-3 py-2 text-xs border-t ${approved ? 'bg-green-50 border-green-100 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
-                        <div className="flex justify-between">
-                            <span>Werk: {Number.isInteger(workHours) ? workHours : workHours.toFixed(1)}u</span>
-                            <span>Vrij: {Number.isInteger(freeHours) ? freeHours : freeHours.toFixed(1)}u</span>
+                        <div className="bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+                            <label className="text-xs text-amber-600 font-medium block mb-1">Vrij</label>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    value={freeHours || ''}
+                                    onChange={e => setFree(parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    min="0" max="8" step="0.5"
+                                    className="w-full text-lg sm:text-base font-semibold text-center py-1 border border-amber-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                                />
+                                <span className="text-xs text-amber-400">u</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -165,44 +161,49 @@
             const weekTarget = HOURS_PER_DAY * 5;
             const pct = weekTarget > 0 ? Math.round((totalHours / weekTarget) * 100) : 0;
             const barPct = Math.min(pct, 100);
-            const fmt = (n) => Number.isInteger(n) ? n : n.toFixed(1);
 
             return (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-5">
+                    {/* Mobile: compact grid / Desktop: spread row */}
+                    <div className="flex items-center justify-between gap-3 sm:gap-4">
+                        <div className="hidden sm:block">
                             <h2 className="text-lg font-semibold text-gray-800">Weektotaal</h2>
                             <p className="text-sm text-gray-500 mt-0.5">
                                 {approvedDays} van 5 dagen voltooid
                             </p>
                         </div>
 
-                        <div className="flex gap-6">
+                        <div className="flex gap-4 sm:gap-6 flex-1 sm:flex-none justify-between sm:justify-end">
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-600">{fmt(totalWork)}</div>
-                                <div className="text-xs text-gray-500">/ {weekTarget}u werkuren</div>
+                                <div className="text-xl sm:text-2xl font-bold text-blue-600">{fmt(totalWork)}</div>
+                                <div className="text-[10px] sm:text-xs text-gray-500">/ {weekTarget}u werk</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-amber-500">{fmt(totalFree)}</div>
-                                <div className="text-xs text-gray-500">vrije uren</div>
+                                <div className="text-xl sm:text-2xl font-bold text-amber-500">{fmt(totalFree)}</div>
+                                <div className="text-[10px] sm:text-xs text-gray-500">vrije uren</div>
                             </div>
                             <div className="text-center">
-                                <div className={`text-2xl font-bold ${pct >= 100 ? 'text-green-600' : 'text-gray-700'}`}>{pct}%</div>
-                                <div className="text-xs text-gray-500">{fmt(totalHours)} / {weekTarget}u</div>
+                                <div className={`text-xl sm:text-2xl font-bold ${pct >= 100 ? 'text-green-600' : 'text-gray-700'}`}>{pct}%</div>
+                                <div className="text-[10px] sm:text-xs text-gray-500">{fmt(totalHours)} / {weekTarget}u</div>
                             </div>
                         </div>
                     </div>
 
                     {/* Progress bar */}
-                    <div className="mt-4 flex items-center gap-3">
-                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div className="mt-3 sm:mt-4 flex items-center gap-2 sm:gap-3">
+                        <div className="flex-1 bg-gray-100 rounded-full h-2.5 sm:h-3 overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
                                 style={{ width: `${barPct}%` }}
                             />
                         </div>
-                        <span className={`text-sm font-medium min-w-[3rem] text-right ${pct >= 100 ? 'text-green-600' : 'text-gray-500'}`}>{pct}%</span>
+                        <span className={`text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-right ${pct >= 100 ? 'text-green-600' : 'text-gray-500'}`}>{pct}%</span>
                     </div>
+
+                    {/* Mobile subtitle */}
+                    <p className="sm:hidden text-xs text-gray-400 mt-2 text-center">
+                        {approvedDays} van 5 dagen voltooid
+                    </p>
                 </div>
             );
         }
@@ -216,7 +217,6 @@
             const weekKey = formatDate(currentMonday);
             const weekData = allData[weekKey] || createEmptyWeek();
 
-            // Load shared data from URL on mount
             useEffect(() => {
                 const shared = decodeWeekFromURL();
                 if (shared && shared.week && shared.days) {
@@ -260,49 +260,51 @@
             const weekEnd = new Date(currentMonday);
             weekEnd.setDate(weekEnd.getDate() + 4);
 
-            const weekLabel = `${currentMonday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} — ${weekEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+            const weekLabel = `${currentMonday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} \u2014 ${weekEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
             return (
-                <div className="max-w-7xl mx-auto px-4 py-6">
+                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
                     {/* Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Weekplanner</h1>
-                            <p className="text-sm text-gray-500">{weekLabel}</p>
+                    <div className="mb-4 sm:mb-6">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Weekplanner</h1>
+                            <button onClick={shareWeek} className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm rounded-lg transition shadow-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
+                                {copied ? 'Gekopieerd!' : 'Deel'}
+                            </button>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => goWeek(-1)} className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                        <p className="text-xs sm:text-sm text-gray-500">{weekLabel}</p>
+
+                        {/* Navigation */}
+                        <div className="flex items-center gap-2 mt-3">
+                            <button onClick={() => goWeek(-1)} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm text-center">
                                 ← Vorige
                             </button>
-                            <button onClick={goToday} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">
+                            <button onClick={goToday} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-center">
                                 Vandaag
                             </button>
-                            <button onClick={() => goWeek(1)} className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                            <button onClick={() => goWeek(1)} className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm text-center">
                                 Volgende →
-                            </button>
-                            <button onClick={shareWeek} className={`px-3 py-2 text-sm rounded-lg transition shadow-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
-                                {copied ? 'Gekopieerd!' : 'Deel week'}
                             </button>
                         </div>
                     </div>
 
                     {/* Shared banner */}
                     {sharedBanner && (
-                        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center justify-between">
-                            <span className="text-sm text-blue-700">Gedeelde weekplanning geladen en opgeslagen.</span>
-                            <button onClick={() => setSharedBanner(null)} className="text-blue-400 hover:text-blue-600 text-lg leading-none">×</button>
+                        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-3 sm:px-4 py-2 flex items-center justify-between">
+                            <span className="text-xs sm:text-sm text-blue-700">Gedeelde weekplanning geladen en opgeslagen.</span>
+                            <button onClick={() => setSharedBanner(null)} className="text-blue-400 hover:text-blue-600 text-lg leading-none ml-2">&times;</button>
                         </div>
                     )}
 
                     {/* Week summary */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                         <WeekSummary days={weekData} />
                     </div>
 
-                    {/* Day columns */}
-                    <div className="flex gap-3 overflow-x-auto pb-4">
+                    {/* Day cards: 2-col grid on mobile, row on desktop */}
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:gap-3">
                         {DAYS.map((day, i) => (
-                            <DayColumn
+                            <DayCard
                                 key={day}
                                 day={day}
                                 dayIndex={i}
