@@ -21,7 +21,6 @@
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-        .ring-progress { transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
         @keyframes toast-in {
             from { opacity: 0; transform: translateY(8px) scale(0.96); }
             to { opacity: 1; transform: translateY(0) scale(1); }
@@ -96,23 +95,51 @@
             return formatDate(mondayDate) === formatDate(getMonday(new Date()));
         }
 
-        // --- Circular Progress Ring ---
-        function ProgressRing({ pct, size = 120, stroke = 8 }) {
-            const radius = (size - stroke) / 2;
-            const circumference = 2 * Math.PI * radius;
-            const offset = circumference - (Math.min(pct, 100) / 100) * circumference;
-            const color = pct >= 100 ? '#22c55e' : '#007AFF';
+        // --- iOS-style Bar Chart ---
+        function WeekBarChart({ days }) {
+            const DAY_SHORT = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr' };
+            const maxHours = Math.max(HOURS_PER_DAY, ...DAYS.map(d => {
+                const dd = days[d] || { workHours: 0, freeHours: 0 };
+                return (parseFloat(dd.workHours) || 0) + (parseFloat(dd.freeHours) || 0);
+            }));
+            const chartMax = Math.max(maxHours, HOURS_PER_DAY) + 1;
+            const targetPct = (HOURS_PER_DAY / chartMax) * 100;
 
             return (
-                <svg width={size} height={size} className="block">
-                    <circle cx={size/2} cy={size/2} r={radius} fill="none"
-                        stroke="#f0f0f0" strokeWidth={stroke} />
-                    <circle cx={size/2} cy={size/2} r={radius} fill="none"
-                        stroke={color} strokeWidth={stroke} strokeLinecap="round"
-                        strokeDasharray={circumference} strokeDashoffset={offset}
-                        className="ring-progress"
-                        style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }} />
-                </svg>
+                <div className="relative w-full" style={{ height: '120px' }}>
+                    {/* Target line */}
+                    <div className="absolute left-0 right-0 flex items-center z-10 pointer-events-none"
+                        style={{ bottom: `${targetPct}%` }}>
+                        <div className="flex-1 border-t border-dashed border-gray-300" />
+                        <span className="text-[10px] text-gray-400 font-medium ml-1.5 bg-white px-1">{HOURS_PER_DAY}u</span>
+                    </div>
+
+                    {/* Bars */}
+                    <div className="flex items-end justify-between h-full gap-2 px-1">
+                        {DAYS.map(day => {
+                            const d = days[day] || { workHours: 0, freeHours: 0 };
+                            const work = parseFloat(d.workHours) || 0;
+                            const free = parseFloat(d.freeHours) || 0;
+                            const total = work + free;
+                            const barPct = chartMax > 0 ? (total / chartMax) * 100 : 0;
+                            const overLimit = total > HOURS_PER_DAY;
+                            const approved = total >= HOURS_PER_DAY;
+                            const barColor = overLimit ? 'bg-red-400' : approved ? 'bg-green-400' : total > 0 ? 'bg-blue-400' : 'bg-gray-100';
+
+                            return (
+                                <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
+                                    <div className="w-full flex items-end" style={{ height: '96px' }}>
+                                        <div
+                                            className={`w-full rounded-md transition-all duration-500 ${barColor}`}
+                                            style={{ height: `${Math.max(barPct, total > 0 ? 4 : 0)}%`, minHeight: total > 0 ? '4px' : '0' }}
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-medium text-gray-400">{DAY_SHORT[day]}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             );
         }
 
@@ -159,46 +186,45 @@
             const weekTarget = HOURS_PER_DAY * 5;
             const pct = weekTarget > 0 ? Math.round((totalHours / weekTarget) * 100) : 0;
             const isEmpty = totalHours === 0;
+            const overLimit = totalHours > weekTarget;
 
             return (
-                <div className="bg-white rounded-2xl shadow-sm p-6">
-                    <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-between">
-                        {/* Ring */}
-                        <div className="relative">
-                            <ProgressRing pct={pct} size={112} stroke={10} />
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className={`text-2xl font-bold tracking-tight ${pct >= 100 ? 'text-green-500' : 'text-gray-900'}`}>{pct}%</span>
-                            </div>
-                        </div>
-
-                        {/* Stats or empty state */}
-                        {isEmpty ? (
-                            <div className="text-center sm:text-left flex-1">
-                                <p className="text-sm text-gray-400">Vul je uren in om je voortgang te zien</p>
-                            </div>
-                        ) : (
-                            <div className="flex gap-8 sm:gap-10">
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalWork)}</div>
-                                    <div className="text-xs text-gray-400 mt-0.5">werkuren</div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalFree)}</div>
-                                    <div className="text-xs text-gray-400 mt-0.5">vrij</div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">{fmt(totalHours)}</div>
-                                    <div className="text-xs text-gray-400 mt-0.5">/ {weekTarget}u</div>
-                                </div>
-                            </div>
-                        )}
+                <div className="bg-white rounded-2xl shadow-sm p-5">
+                    {/* Hero stat */}
+                    <div className="flex items-baseline gap-2 mb-4">
+                        <span className={`text-3xl font-bold tracking-tight ${overLimit ? 'text-red-500' : pct >= 100 ? 'text-green-500' : 'text-gray-900'}`}>
+                            {fmt(totalHours)}
+                        </span>
+                        <span className="text-sm text-gray-400">/ {weekTarget} uur</span>
+                        <span className={`ml-auto text-sm font-semibold tabular-nums ${overLimit ? 'text-red-500' : pct >= 100 ? 'text-green-500' : 'text-gray-400'}`}>
+                            {pct}%
+                        </span>
                     </div>
 
-                    {/* Days badge */}
-                    <div className="mt-4 flex justify-center sm:justify-start">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                    {/* Bar chart */}
+                    {isEmpty ? (
+                        <div className="flex items-center justify-center py-8">
+                            <p className="text-sm text-gray-400">Vul je uren in om je voortgang te zien</p>
+                        </div>
+                    ) : (
+                        <WeekBarChart days={days} />
+                    )}
+
+                    {/* Stats row */}
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex gap-5">
+                            <div>
+                                <span className="text-sm font-semibold text-gray-900">{fmt(totalWork)}</span>
+                                <span className="text-xs text-gray-400 ml-1">werk</span>
+                            </div>
+                            <div>
+                                <span className="text-sm font-semibold text-gray-900">{fmt(totalFree)}</span>
+                                <span className="text-xs text-gray-400 ml-1">vrij</span>
+                            </div>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-0.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${approvedDays >= 5 ? 'bg-green-500' : 'bg-gray-300'}`} />
-                            {approvedDays} van 5 dagen
+                            {approvedDays}/5 dagen
                         </span>
                     </div>
                 </div>
@@ -237,7 +263,8 @@
                     onFocus={(e) => { setFocused(true); setLocalValue(value ? String(value) : ''); e.target.select(); }}
                     onBlur={handleBlur}
                     placeholder="0"
-                    inputMode="decimal"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
                     min="0" max={max} step="0.5"
                     className="w-full h-12 text-center text-lg font-semibold text-gray-900 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-sm transition-all"
                 />
@@ -250,28 +277,33 @@
             const freeHours = parseFloat(data.freeHours) || 0;
             const totalDay = workHours + freeHours;
             const approved = totalDay >= HOURS_PER_DAY;
+            const overLimit = totalDay > HOURS_PER_DAY;
             const dayPct = Math.min((totalDay / HOURS_PER_DAY) * 100, 100);
 
             const setWork = (val) => onChange(day, { ...data, workHours: val });
             const setFree = (val) => onChange(day, { ...data, freeHours: val });
 
+            const accentColor = overLimit ? 'bg-red-400' : approved ? 'bg-green-400' : 'bg-gray-200';
+            const textColor = overLimit ? 'text-red-500' : approved ? 'text-green-500' : 'text-gray-300';
+            const barColor = overLimit ? 'bg-red-400' : approved ? 'bg-green-400' : dayPct > 0 ? 'bg-blue-400' : '';
+
             return (
                 <div className={`bg-white rounded-2xl shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md sm:flex-1 relative ${isToday ? 'ring-2 ring-blue-500/20' : ''}`}>
-                    {/* Approved accent — inner bar that doesn't break radius */}
+                    {/* Status accent — inner bar */}
                     {approved && (
-                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400 rounded-l-2xl sm:w-full sm:h-1 sm:rounded-t-2xl sm:rounded-l-none" />
+                        <div className={`absolute top-0 left-0 w-1 h-full ${accentColor} rounded-l-2xl sm:w-full sm:h-1 sm:rounded-t-2xl sm:rounded-l-none`} />
                     )}
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 sm:flex-col sm:items-center sm:gap-0.5 sm:pt-4 sm:pb-3">
                         <div className="flex items-center gap-2 sm:flex-col sm:items-center">
                             <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${approved ? 'bg-green-400' : 'bg-gray-200'}`} />
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${accentColor}`} />
                                 <span className="font-semibold text-gray-900">{DAY_LABELS[day]}</span>
                             </div>
                             <span className="text-xs text-gray-400">{getDayDate(mondayDate, dayIndex)}</span>
                         </div>
-                        <span className={`text-sm font-semibold tabular-nums transition-colors duration-300 ${approved ? 'text-green-500' : 'text-gray-300'}`}>
+                        <span className={`text-sm font-semibold tabular-nums transition-colors duration-300 ${textColor}`}>
                             {fmt(totalDay)}/{HOURS_PER_DAY}u
                         </span>
                     </div>
@@ -291,7 +323,7 @@
                     {/* Day progress */}
                     <div className="h-1 bg-gray-100">
                         <div
-                            className={`h-full transition-all duration-500 ${approved ? 'bg-green-400' : dayPct > 0 ? 'bg-blue-400' : ''}`}
+                            className={`h-full transition-all duration-500 ${barColor}`}
                             style={{ width: `${dayPct}%` }}
                         />
                     </div>
