@@ -117,12 +117,11 @@
                 const dd = days[d] || { workHours: 0, freeHours: 0 };
                 return (parseFloat(dd.workHours) || 0) + (parseFloat(dd.freeHours) || 0);
             }));
-            const chartMax = Math.ceil((Math.max(maxHours, HOURS_PER_DAY) + 1) / 2) * 2;
-            const gridSteps = [];
-            for (let i = 0; i <= chartMax; i += Math.max(1, Math.floor(chartMax / 4))) {
-                gridSteps.push(i);
-            }
-            if (gridSteps[gridSteps.length - 1] !== chartMax) gridSteps.push(chartMax);
+            // Round up to nearest even number, ensure headroom above target
+            const chartMax = Math.ceil((Math.max(maxHours, HOURS_PER_DAY) + 2) / 2) * 2;
+            // Only 3 grid steps: 0, mid, top — like iOS
+            const midStep = chartMax / 2;
+            const gridSteps = [0, midStep, chartMax];
 
             const targetPct = (HOURS_PER_DAY / chartMax) * 100;
             const barAreaH = 120;
@@ -130,32 +129,27 @@
 
             return (
                 <div className="w-full flex">
-                    {/* Bordered chart container (bars + grid + x-axis labels) */}
-                    <div className="flex-1" style={{ border: '0.5px solid var(--system-gray5)', borderRadius: '4px', overflow: 'hidden' }}>
-                        {/* Bar area */}
+                    {/* Chart + day labels column */}
+                    <div className="flex-1">
+                        {/* Bar area with horizontal grid lines */}
                         <div className="relative" style={{ height: `${barAreaH}px` }}>
-                            {/* Horizontal grid lines — full width */}
-                            {gridSteps.map(step => {
-                                const pct = (step / chartMax) * 100;
-                                return (
-                                    <div key={step} className="absolute left-0 right-0 pointer-events-none"
-                                        style={{ bottom: `${pct}%`, height: '0.5px', background: 'var(--system-gray5)' }} />
-                                );
-                            })}
+                            {/* Horizontal grid lines */}
+                            {gridSteps.map(step => (
+                                <div key={step} className="absolute left-0 right-0 pointer-events-none"
+                                    style={{ bottom: `${(step / chartMax) * 100}%`, height: '0.5px', background: 'var(--system-gray5)' }} />
+                            ))}
 
-                            {/* Target/average dashed line */}
-                            <div className="absolute left-0 right-0 pointer-events-none"
-                                style={{ bottom: `${targetPct}%`, zIndex: 2 }}>
-                                <div style={{
-                                    height: '1.5px',
-                                    backgroundImage: 'repeating-linear-gradient(to right, var(--system-green) 0, var(--system-green) 6px, transparent 6px, transparent 10px)',
-                                    backgroundSize: '10px 1.5px'
-                                }} />
+                            {/* Target dashed line */}
+                            <div className="absolute pointer-events-none"
+                                style={{ bottom: `${targetPct}%`, left: 0, right: 0, zIndex: 2 }}>
+                                <svg width="100%" height="2" style={{ display: 'block' }}>
+                                    <line x1="0" y1="1" x2="100%" y2="1" stroke="var(--system-green)" strokeWidth="1.5" strokeDasharray="6 4" />
+                                </svg>
                             </div>
 
-                            {/* Bars + vertical dividers */}
-                            <div className="flex items-end h-full">
-                                {DAYS.map((day, i) => {
+                            {/* Bars */}
+                            <div className="flex items-end h-full" style={{ gap: '4px', padding: '0 4px' }}>
+                                {DAYS.map((day) => {
                                     const d = days[day] || { workHours: 0, freeHours: 0 };
                                     const work = parseFloat(d.workHours) || 0;
                                     const free = parseFloat(d.freeHours) || 0;
@@ -164,12 +158,11 @@
                                     const totalPx = chartMax > 0 ? (total / chartMax) * barAreaH : 0;
 
                                     return (
-                                        <div key={day} className="flex-1 flex items-end justify-center relative"
-                                            style={{ borderRight: i < DAYS.length - 1 ? '0.5px solid var(--system-gray5)' : 'none' }}>
+                                        <div key={day} className="flex-1 flex items-end justify-center">
                                             {total > 0 && (
                                                 overLimit ? (
                                                     <div style={{
-                                                        width: '70%',
+                                                        width: '80%',
                                                         height: `${Math.max(totalPx, 4)}px`,
                                                         background: 'var(--system-red)',
                                                         borderRadius: '4px 4px 0 0',
@@ -177,7 +170,7 @@
                                                     }} />
                                                 ) : (
                                                     <div className="flex flex-col-reverse" style={{
-                                                        width: '70%',
+                                                        width: '80%',
                                                         height: `${Math.max(totalPx, 4)}px`,
                                                         borderRadius: '4px 4px 0 0',
                                                         overflow: 'hidden',
@@ -202,12 +195,11 @@
                             </div>
                         </div>
 
-                        {/* X-axis day labels — inside border */}
-                        <div className="flex" style={{ height: `${labelRowH}px`, borderTop: '0.5px solid var(--system-gray5)' }}>
-                            {DAYS.map((day, i) => (
-                                <div key={day} className="flex-1 flex items-center justify-center"
-                                    style={{ borderRight: i < DAYS.length - 1 ? '0.5px solid var(--system-gray5)' : 'none' }}>
-                                    <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: 1 }}>
+                        {/* Day labels — below the 0-line */}
+                        <div className="flex" style={{ padding: '6px 4px 0' }}>
+                            {DAYS.map((day) => (
+                                <div key={day} className="flex-1 text-center">
+                                    <span style={{ fontSize: '10px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: 1 }}>
                                         {DAY_SINGLE[day]}
                                     </span>
                                 </div>
@@ -215,30 +207,27 @@
                         </div>
                     </div>
 
-                    {/* Y-axis labels + gemid. label — outside border, to the right */}
-                    <div className="relative flex-shrink-0" style={{ width: '40px', marginBottom: `${labelRowH}px` }}>
-                        {gridSteps.map(step => {
-                            const pct = (step / chartMax) * 100;
-                            return (
-                                <span key={step} className="absolute" style={{
-                                    right: 0,
-                                    bottom: `${pct}%`,
-                                    transform: 'translateY(50%)',
-                                    fontSize: '11px',
-                                    fontWeight: 400,
-                                    color: 'var(--label-secondary)',
-                                    lineHeight: 1
-                                }}>
-                                    {step === 0 ? '0' : `${step} u`}
-                                </span>
-                            );
-                        })}
+                    {/* Y-axis labels + gemid. */}
+                    <div className="relative flex-shrink-0" style={{ width: '36px', marginBottom: `${labelRowH}px` }}>
+                        {gridSteps.map(step => (
+                            <span key={step} className="absolute" style={{
+                                left: '6px',
+                                bottom: `${(step / chartMax) * 100}%`,
+                                transform: 'translateY(50%)',
+                                fontSize: '10px',
+                                fontWeight: 400,
+                                color: 'var(--label-secondary)',
+                                lineHeight: 1
+                            }}>
+                                {step === 0 ? '0' : `${step} u`}
+                            </span>
+                        ))}
                         <span className="absolute" style={{
-                            right: 0,
+                            left: '6px',
                             bottom: `${targetPct}%`,
-                            transform: 'translateY(-140%)',
-                            fontSize: '11px',
-                            fontWeight: 500,
+                            transform: 'translateY(-130%)',
+                            fontSize: '10px',
+                            fontWeight: 600,
                             color: 'var(--system-green)',
                             lineHeight: 1,
                             whiteSpace: 'nowrap'
@@ -296,27 +285,25 @@
 
             return (
                 <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '13px' }}>
-                    {/* Hero stat — iOS Screen Time pattern: label on top, value below, comparison right */}
-                    <div className="flex items-end justify-between" style={{ marginBottom: '20px' }}>
-                        <div>
-                            <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '2px' }}>
-                                Totaal deze week
-                            </p>
+                    {/* Hero stat — iOS Screen Time pattern */}
+                    <div style={{ marginBottom: '16px' }}>
+                        <p style={{ fontSize: '13px', fontWeight: 400, color: 'var(--label-secondary)', lineHeight: '18px', marginBottom: '2px' }}>
+                            Totaal deze week
+                        </p>
+                        <div className="flex items-baseline justify-between">
                             <span style={{
-                                fontSize: '34px',
+                                fontSize: '28px',
                                 fontWeight: 700,
-                                color: overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-primary)',
+                                color: overLimit ? 'var(--system-red)' : 'var(--label-primary)',
                                 letterSpacing: '-0.4px',
-                                lineHeight: '41px'
+                                lineHeight: '34px'
                             }}>
-                                {fmt(totalHours)} <span style={{ fontSize: '22px', fontWeight: 400 }}>uur</span>
+                                {fmt(totalHours)} <span style={{ fontSize: '20px', fontWeight: 400 }}>uur</span>
                             </span>
-                        </div>
-                        <div className="text-right" style={{ paddingBottom: '4px' }}>
                             <span className="tabular-nums" style={{
                                 fontSize: '13px',
-                                fontWeight: 500,
-                                color: overLimit ? 'var(--system-red)' : pct >= 100 ? 'var(--system-green)' : 'var(--label-secondary)',
+                                fontWeight: 400,
+                                color: 'var(--label-secondary)',
                                 lineHeight: '18px'
                             }}>
                                 {pct}% van {weekTarget}u
