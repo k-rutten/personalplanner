@@ -234,9 +234,10 @@
                     type="number"
                     value={focused ? localValue : (value || '')}
                     onChange={handleChange}
-                    onFocus={() => { setFocused(true); setLocalValue(value ? String(value) : ''); }}
+                    onFocus={(e) => { setFocused(true); setLocalValue(value ? String(value) : ''); e.target.select(); }}
                     onBlur={handleBlur}
                     placeholder="0"
+                    inputMode="decimal"
                     min="0" max={max} step="0.5"
                     className="w-full h-12 text-center text-lg font-semibold text-gray-900 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-sm transition-all"
                 />
